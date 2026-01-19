@@ -80,7 +80,7 @@ PuertsModule.cpp:
 ![](./Resources/genuedts.png)
 
 
-Typescript工程编译有两种方式，一种是用TSC命令直接编译，需要从官方下载安装Typescript环境，然后通过VSCode编辑器运行构建命令，这种方式相对复杂一点，这里不多做介绍。
+### Typescript工程编译
 
  #### 第一种方式：在项目设置的Puerts中启用Puerts插件自带的编译脚本，通过V8虚拟机执行编译，并且在UE编辑器运行期间会对Typescript目录进行监听，一旦有文件修改便会自动进行编译。如下图所示：
 ![](./Resources/puertsautocompile.png)
