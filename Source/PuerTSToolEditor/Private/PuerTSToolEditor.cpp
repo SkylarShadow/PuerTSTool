@@ -1,364 +1,80 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "PuerTSToolEditor.h"
-#include "BlueprintEditorModule.h"
-#include "ContentBrowserModule.h"
+
+#include "AutoMixin/AutoMixinBPToolBar.h"
 #include "AutoMixin/AutoMixinStyle.h"
 #include "AutoMixin/AutoMixinCommands.h"
-#include "Framework/Notifications/NotificationManager.h"
-#include "Styling/SlateStyleRegistry.h"
-#include "Widgets/Notifications/SNotificationList.h"
-
+#include "AutoMixin/AutoMixinBPToolBar.h"
+#include "AutoMixin/AutoMixinCMToolBar.h"
 
 #define LOCTEXT_NAMESPACE "FPuerTSToolEditorModule"
 
-
-// 常量定义
-static const FString TEMPLATE_NAME = TEXT("MixinTemplate.ts"); // 模板文件名
-static const FString MIXIN_NAME = TEXT("mixin.ts"); // mixin文件名
 static const FString TYPE_SCRIPT_DIR = TEXT("TypeScript"); // TypeScript文件夹
-static const FString PUERTS_RESOURCES_PATH = TEXT("Puerts/Resources"); // Puerts资源路径
+static const FString PUERTS_FRAMEWORK_PATH = TEXT("PuerTSTool/Typescript"); // Puerts资源路径
 
-static const FString AUTO_IMPORT_NAME = TEXT("AutoImport.ts"); // 自动导入文件名
+
 
 TSharedPtr<FSlateStyleSet> FPuerTSToolEditorModule::StyleSet = nullptr;
 
-// 存储最后一个标签页
-static TWeakPtr<SDockTab> LastForegroundTab = nullptr;
-
-// 标签切换事件句柄
-static FDelegateHandle TabForegroundedHandle;
-
-// 获取AssetEditorSubsystem
-static UAssetEditorSubsystem* AssetEditorSubsystem = nullptr;
-
-// 编辑器窗口
-static IAssetEditorInstance* AssetEditorInstance = nullptr;
-
-// 最后激活的蓝图指针
-static UBlueprint* LastBlueprint = nullptr;
 
 void FPuerTSToolEditorModule::StartupModule()
 {
-	// 获取AssetEditorSubsystem
-	AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
-
-	AddMixinFile(); // 添加mixin文件
 	DeployPuerTSFramework();
 	FAutoMixinStyle::Initialize();
 	FAutoMixinStyle::ReloadTextures();
-	
 	FAutoMixinCommands::Register();
-
-	RegistrationButton(); // 注册(蓝图)按键
-	RegistrationContextButton(); // 注册右键菜单
-
-	// 订阅标签切换事件
-	TabForegroundedHandle = FGlobalTabmanager::Get()->OnTabForegrounded_Subscribe(
-		FOnActiveTabChanged::FDelegate::CreateLambda([](const TSharedPtr<SDockTab>& NewlyActiveTab, const TSharedPtr<SDockTab>& PreviouslyActiveTab)
-		{
-			if (!NewlyActiveTab.IsValid() || NewlyActiveTab == LastForegroundTab.Pin())
-			{
-				return;
-			}
-			// 不是主要的Tab（比如EventGraph，等图标）也返回
-			if (NewlyActiveTab.Get()->GetTabRole() != MajorTab) return;
-			LastForegroundTab = NewlyActiveTab;
-			if (LastForegroundTab.IsValid())
-			{
-				// UE_LOG(LogTemp, Log, TEXT("标签页已切换: %s"), *LastForegroundTab.Pin().Get()->GetTabLabel().ToString());
-			}
-		})
-	);
-}
-
-// 注册(蓝图)按键
-void FPuerTSToolEditorModule::RegistrationButton() const
-{
-	// 获取蓝图编辑器模块
-	FBlueprintEditorModule& BlueprintEditorModule = FModuleManager::LoadModuleChecked<FBlueprintEditorModule>("Kismet");
-
-	// 创建一个菜单扩展器
-	const TSharedPtr<FExtender> MenuExtender = MakeShareable(new FExtender());
-
-	// 向工具栏添加扩展，在"Debugging" 工具按钮前面添加
-	MenuExtender->AddToolBarExtension(
-		"Debugging", // 扩展点名称（在调试工具栏区域）
-		EExtensionHook::First, // 插入位置（最前面）
-		nullptr, // 不使用命令列表
-		FToolBarExtensionDelegate::CreateLambda([this](FToolBarBuilder& ToolbarBuilder)
-		{
-			// 添加工具栏按钮
-			ToolbarBuilder.AddToolBarButton(
-				FUIAction( // 按钮动作
-					FExecuteAction::CreateLambda([this]()
-					{
-						ButtonPressed(); // 调用按钮点击处理函数
-					})
-				),
-				NAME_None, // 没有命令名
-				LOCTEXT("GenerateTemplate", "创建TS文件"), // 按钮显示文本
-				LOCTEXT("GenerateTemplateTooltip", "生成TypeScript文件"), // 按钮提示文本
-				FSlateIcon( FAutoMixinStyle::GetStyleSetName(), "AutoMixinIcon") // 按钮图标（这里使用空图标）
-			);
-		})
-	);
-
-	// 将扩展器添加到蓝图编辑器的菜单扩展管理器
-	BlueprintEditorModule.GetMenuExtensibilityManager()->AddExtender(MenuExtender);
-}
-
-// 在内容浏览器右键的时候注册一个按键
-void FPuerTSToolEditorModule::RegistrationContextButton() const
-{
-	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>(TEXT("ContentBrowser"));
-	TArray<FContentBrowserMenuExtender_SelectedAssets>& CBMenuAssetExtenderDelegates = ContentBrowserModule.GetAllAssetViewContextMenuExtenders();
-
-	// 创建菜单扩展委托
-	FContentBrowserMenuExtender_SelectedAssets MenuExtenderDelegate;
-	MenuExtenderDelegate.BindLambda([this](const TArray<FAssetData>& SelectedAssets)
-	{
-		TSharedRef<FExtender> Extender = MakeShared<FExtender>();
-
-		Extender->AddMenuExtension(
-			"GetAssetActions", // 扩展菜单的锚点位置
-			EExtensionHook::After, // 在指定锚点之后插入
-			nullptr, // 无命令列表
-			FMenuExtensionDelegate::CreateLambda([this, SelectedAssets](FMenuBuilder& MenuBuilder)
-			{
-				// 添加菜单项
-				MenuBuilder.AddMenuEntry(
-					LOCTEXT("GenerateTSFile", "创建TS文件"), // 菜单文本
-					LOCTEXT("GenerateTSFileTooltip", "生成TypeScript文件"), // 提示信息
-					FSlateIcon(FAutoMixinStyle::GetStyleSetName(), "AutoMixinIcon"), // 使用自定义图标
-					FUIAction(
-						FExecuteAction::CreateLambda([this, SelectedAssets]()
-						{
-							// 点击时处理选中的资源
-							ContextButtonPressed(SelectedAssets);
-						}),
-						FCanExecuteAction::CreateLambda([SelectedAssets]()
-						{
-							// 可选：验证是否允许执行（例如至少选中一个资产）
-							return SelectedAssets.Num() > 0;
-						})
-					)
-				);
-			})
-		);
-		return Extender;
-	});
-
-	// 注册扩展委托
-	CBMenuAssetExtenderDelegates.Add(MenuExtenderDelegate);
+	
+	AutoMixinBPToolBar = MakeShared<FAutoMixinBPToolBar>();
+	AutoMixinBPToolBar->Initialize();
+	
+	AutoMixinCMToolBar = MakeShared<FAutoMixinCMToolBar>();
+	AutoMixinCMToolBar->Initialize();
+	
 }
 
 
-// 当按钮被按下时调用此函数
-void FPuerTSToolEditorModule::ButtonPressed()
-{
-	// UE_LOG(LogTemp, Log, TEXT("ButtonPressed"));
-	if (UBlueprint* Blueprint = GetActiveBlueprint())
-	{
-		GenerateTs(Blueprint);
-	}
-}
 
-
-void FPuerTSToolEditorModule::ContextButtonPressed(const TArray<FAssetData>& SelectedAssets)
-{
-	// 确保至少有一个资产被选中
-	if (SelectedAssets.IsEmpty()) return;
-	for (const FAssetData& AssetData : SelectedAssets)
-	{
-		// 获取选中的蓝图
-		if (UBlueprint* Blueprint = Cast<UBlueprint>(AssetData.GetAsset()))
-		{
-			GenerateTs(Blueprint);
-		}
-	}
-}
-
-// 生成TS文件
-void FPuerTSToolEditorModule::GenerateTs(const UBlueprint* Blueprint)
-{
-	if (Blueprint)
-	{
-		// 获取蓝图的路径名称
-		const FString BlueprintPath = Blueprint->GetPathName();
-		FString Lefts, Rights;
-		BlueprintPath.Split(".", &Lefts, &Rights);
-
-		TArray<FString> OutStrings;
-		Lefts.ParseIntoArray(OutStrings,TEXT("/"), true);
-
-		// 实际路径
-		FString ActualPath;
-
-		if (OutStrings[0] == "Game")ActualPath = Lefts.Mid(5);
-		else ActualPath = Lefts;
-
-		// ts文件路径
-		FString TsFilePath = FString(TEXT("TypeScript")) + ActualPath;
-		TsFilePath = FPaths::Combine(FPaths::ProjectDir(), *(TsFilePath + ".ts"));
-
-		// 如果ts文件不存在，则创建它
-		if (!FPaths::FileExists(TsFilePath))
-		{
-			// 解析蓝图路径以获取文件名
-			TArray<FString> StringArray;
-			Rights.ParseIntoArray(StringArray,TEXT("/"), false);
-			const FString FileName = StringArray[StringArray.Num() - 1];
-
-			// 读取模板文件
-			const FString TemplatePath = FPaths::Combine(FPaths::ProjectPluginsDir(), PUERTS_RESOURCES_PATH, TEMPLATE_NAME);
-			FString TemplateContent;
-			if (FFileHelper::LoadFileToString(TemplateContent, *TemplatePath))
-			{
-
-
-				const FString TypeScriptRootPath = FPaths::Combine(FPaths::ProjectDir(), TYPE_SCRIPT_DIR);
-				const FString TsFileDir = FPaths::GetPath(TsFilePath);
-				
-				// 计算从TS文件目录到TypeScript根目录的相对路径
-				// 需要在目录路径后添加 "/" 以确保 MakePathRelativeTo 正确工作
-				FString RootRelativePath = TypeScriptRootPath / TEXT("");
-				const FString TsFileDirWithSlash = TsFileDir / TEXT("");
-				
-				if (FPaths::MakePathRelativeTo(RootRelativePath, *TsFileDirWithSlash))
-				{
-					// 移除末尾的斜杠（如果有）
-					RootRelativePath.RemoveFromEnd(TEXT("/"));
-					// 如果路径为空，说明在同一目录
-					if (RootRelativePath.IsEmpty())
-					{
-						RootRelativePath = TEXT(".");
-					}
-				}
-				else
-				{
-					// 如果计算失败，使用默认值
-					RootRelativePath = TEXT(".");
-				}
-
-				UE_LOG(LogTemp, Log, TEXT("计算出的相对路径: %s"), *RootRelativePath);
-
-				// 处理模板并生成ts文件内容
-				const FString TsContent = ProcessTemplate(TemplateContent, BlueprintPath, FileName, RootRelativePath);
-				// 保存生成的内容到文件
-				if (FFileHelper::SaveStringToFile(TsContent, *TsFilePath, FFileHelper::EEncodingOptions::ForceUTF8))
-				{
-					// 显示通知
-					FNotificationInfo Info(FText::Format(LOCTEXT("TsFileGenerated", "TS文件生成成功->路径{0}"), FText::FromString(TsFilePath)));
-					Info.ExpireDuration = 5.f;
-					FSlateNotificationManager::Get().AddNotification(Info);
-
-					// 更新AutoImport.ts文件
-					const FString AutoImportTsPath = FPaths::Combine(FPaths::ProjectDir(), TYPE_SCRIPT_DIR, AUTO_IMPORT_NAME);
-					FString AutoImportTsContent;
-
-					// 读取现有内容
-					if (FFileHelper::LoadFileToString(AutoImportTsContent, *AutoImportTsPath))
-					{
-						// 确保没有重复的导入语句
-						const FString ImportStatement = TEXT("import \"./") + ActualPath.Mid(1) + "\";";
-						if (!AutoImportTsContent.Contains(ImportStatement))
-						{
-							AutoImportTsContent += ImportStatement + TEXT("\n");
-							FFileHelper::SaveStringToFile(AutoImportTsContent, *AutoImportTsPath, FFileHelper::EEncodingOptions::ForceUTF8);
-							UE_LOG(LogTemp, Log, TEXT("AutoImport.ts更新成功"));
-						}
-					}
-				}
-			}
-			else
-			{
-				// 如果模板文件不存在，记录警告
-				UE_LOG(LogTemp, Warning, TEXT("MixinTemplate.ts不存在"));
-			}
-		}
-	}
-}
-
-// 获取当前激活的蓝图
-UBlueprint* FPuerTSToolEditorModule::GetActiveBlueprint()
-{
-	// 遍历所有被编辑的资产 并找到活动蓝图
-	if (!AssetEditorSubsystem) return nullptr;
-
-	for (const TArray<UObject*> EditedAssets = AssetEditorSubsystem->GetAllEditedAssets(); UObject* EditedAsset : EditedAssets)
-	{
-		AssetEditorInstance = AssetEditorSubsystem->FindEditorForAsset(EditedAsset, false);
-
-		if (!AssetEditorInstance || !IsValid(EditedAsset) || !EditedAsset->IsA<UBlueprint>()) continue;
-
-		TSharedPtr<SDockTab> Tab = LastForegroundTab.Pin();
-		if (!Tab.IsValid()) return nullptr;
-
-		if (
-			Tab->GetTabLabel().ToString() ==
-			AssetEditorInstance->GetAssociatedTabManager().Get()->GetOwnerTab().Get()->GetTabLabel().ToString()
-		)
-		{
-			LastBlueprint = CastChecked<UBlueprint>(EditedAsset);
-			break;
-		}
-	}
-
-	// 返回最后激活的蓝图
-	return LastBlueprint;
-}
-
-//TODO: 改造这个
-// 处理模板
-FString FPuerTSToolEditorModule::ProcessTemplate(const FString& TemplateContent, FString BlueprintPath, const FString& FileName, const FString& RootRelativePath)
-{
-	FString Result = TemplateContent;
-
-	// 获取蓝图完整类名（包括_C后缀）
-	BlueprintPath += TEXT("_C");
-	const FString BlueprintClass = TEXT("UE") + BlueprintPath.Replace(TEXT("/"), TEXT("."));
-
-	const FString ROOT_PATH = TEXT("ROOT_PATH"); // 脚本根目录路径
-	const FString BLUEPRINT_PATH = TEXT("BLUEPRINT_PATH"); // 蓝图路径
-	const FString MIXIN_BLUEPRINT_TYPE = TEXT("MIXIN_BLUEPRINT_TYPE"); // 混入蓝图类型
-	const FString TS_NAME = TEXT("TS_NAME"); // TS文件名
-
-	Result = Result.Replace(*ROOT_PATH, *RootRelativePath); // 替换 脚本根目录路径
-	Result = Result.Replace(*BLUEPRINT_PATH, *BlueprintPath); // 替换 蓝图路径
-	Result = Result.Replace(*MIXIN_BLUEPRINT_TYPE, *BlueprintClass); // 替换 混入蓝图类型
-	Result = Result.Replace(*TS_NAME, *FileName); // 替换 TS文件名
-
-	return Result;
-}
-
-
-//TODO: 将框架复制到对应位置
-// 添加混入文件
-void FPuerTSToolEditorModule::AddMixinFile() const
-{
-	if (!FPaths::FileExists(MixinPath))
-	{
-		const FString MixinTemplatePath = FPaths::Combine(FPaths::ProjectPluginsDir(), PUERTS_RESOURCES_PATH, MIXIN_NAME);
-		FString MixinContent;
-		if (FFileHelper::LoadFileToString(MixinContent, *MixinTemplatePath))
-		{
-			FFileHelper::SaveStringToFile(MixinContent, *MixinPath, FFileHelper::EEncodingOptions::ForceUTF8);
-		}
-	}
-
-	// 生成 AutoImport.ts 文件
-	const FString AutoImportPath = FPaths::Combine(FPaths::ProjectDir(), TYPE_SCRIPT_DIR, AUTO_IMPORT_NAME);
-	if (!FPaths::FileExists(AutoImportPath))
-	{
-		const FString AutoImportContent = TEXT("// 自动导入文件，用于导入所有通过Puerts创建的UE蓝图TypeScript绑定文件\n\n");
-		FFileHelper::SaveStringToFile(AutoImportContent, *AutoImportPath, FFileHelper::EEncodingOptions::ForceUTF8);
-	}
-}
 
 void FPuerTSToolEditorModule::DeployPuerTSFramework() const
 {
+	// 插件内 TypeScript 框架目录
+	const FString SourceDir = FPaths::Combine(
+		FPaths::ProjectPluginsDir(),
+		PUERTS_FRAMEWORK_PATH
+	);
 
+	// 项目目录下 TypeScript
+	const FString TargetDir = FPaths::Combine(
+		FPaths::ProjectDir(),
+		TYPE_SCRIPT_DIR
+	);
+
+	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+
+	// 1️ 确保目标目录存在
+	if (!PlatformFile.DirectoryExists(*TargetDir))
+	{
+		PlatformFile.CreateDirectoryTree(*TargetDir);
+	}
+
+	// 2️ 递归复制目录
+	const bool bOverwrite = false; // 是否覆盖已有文件 //TODO:暴露给设置
+
+	bool bSuccess = PlatformFile.CopyDirectoryTree(
+		*TargetDir,
+		*SourceDir,
+		bOverwrite
+	);
+
+	if (bSuccess)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Deploy PuerTS Framework Success:\n%s -> %s"), *SourceDir, *TargetDir);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Deploy PuerTS Framework Failed:\n%s -> %s"), *SourceDir, *TargetDir);
+	}
 }
 
 
@@ -368,9 +84,9 @@ void FPuerTSToolEditorModule::ShutdownModule()
 	FAutoMixinStyle::Shutdown();
 	
 	FAutoMixinCommands::Unregister();
-
-	// 取消订阅标签切换事件
-	FGlobalTabmanager::Get()->OnTabForegrounded_Unsubscribe(TabForegroundedHandle);
+	
+	AutoMixinBPToolBar->Uninitialize();
+	AutoMixinCMToolBar->Uninitialize();
 }
 
 #undef LOCTEXT_NAMESPACE

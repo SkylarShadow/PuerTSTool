@@ -19,17 +19,20 @@
 
 // 常量定义
 static const FString TEMPLATE_NAME = TEXT("MixinTemplate.ts"); // 模板文件名
-static const FString MIXIN_NAME = TEXT("mixin.ts"); // mixin文件名
 static const FString TYPE_SCRIPT_DIR = TEXT("TypeScript"); // TypeScript文件夹
-static const FString PUERTS_RESOURCES_PATH = TEXT("Puerts/Resources"); // Puerts资源路径
+static const FString PUERTS_FRAMEWORK_PATH = TEXT("PuerTSTool/Resources"); // Puerts资源路径
 
-static const FString AUTO_IMPORT_NAME = TEXT("AutoImport.ts"); // 自动导入文件名
+static const FString AUTO_IMPORT_NAME = TEXT("PreMixin.ts"); // 自动导入文件名
 
 FAutoMixinEditorTool::FAutoMixinEditorTool()
 {
 }
 
 void FAutoMixinEditorTool::Initialize()
+{
+}
+
+void FAutoMixinEditorTool::Uninitialize()
 {
 }
 
@@ -68,7 +71,7 @@ void FAutoMixinEditorTool::GenerateTS(const UBlueprint * Blueprint)
 			const FString FileName = StringArray[StringArray.Num() - 1];
 
 			// 读取模板文件
-			const FString TemplatePath = FPaths::Combine(FPaths::ProjectPluginsDir(), PUERTS_RESOURCES_PATH, TEMPLATE_NAME);
+			const FString TemplatePath = FPaths::Combine(FPaths::ProjectPluginsDir(), PUERTS_FRAMEWORK_PATH, TEMPLATE_NAME);
 			FString TemplateContent;
 			if (FFileHelper::LoadFileToString(TemplateContent, *TemplatePath))
 			{
