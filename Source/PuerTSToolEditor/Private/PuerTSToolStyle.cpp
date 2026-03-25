@@ -41,7 +41,7 @@ TSharedRef< FSlateStyleSet > FPuerTSToolStyle::Create()
 	TSharedRef< FSlateStyleSet > Style = MakeShareable(new FSlateStyleSet("PuerTSToolStyle"));
 	Style->SetContentRoot(IPluginManager::Get().FindPlugin("PuerTSTool")->GetBaseDir() / TEXT("Resources"));
 
-	Style->Set("PuerTSAutoMixinTool.PluginAction", new IMAGE_BRUSH_SVG(TEXT("AutoMixinIcon40"), Icon20x20));
+	Style->Set("PuerTSAutoMixinTool.PluginAction", new IMAGE_BRUSH(TEXT("AutoMixinIcon40"), Icon20x20));
 	return Style;
 }
 

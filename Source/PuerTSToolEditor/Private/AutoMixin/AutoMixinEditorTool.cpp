@@ -116,7 +116,7 @@ void FAutoMixinEditorTool::GenerateTS(const UBlueprint * Blueprint)
 						OpenCodeEditorForBpTS(TsFilePath);
 					});
 
-					// 👇 超链接显示文字
+					// 超链接显示文字
 					Info.HyperlinkText = LOCTEXT("Open TS File In Code Editor", "在代码编辑器中打开TypeScript文件");
 
 					
