@@ -165,7 +165,7 @@ private:
 	
 	// 自动Mixin路径列表，仅保存路径，不持有UClass。
 	// 这是监听模式的“mixin列表”：NotifyUObjectCreated发现UClass后用GetPathName()与这里匹配。
-	TSet<FString> m_autoMixinClassPaths;
+	TSet<FString> m_autoMixinClassPaths; //TODO: 如果查到FString开销大用FName代替？
 
 	// 已Mixin的UClass弱引用，用于防止同一个活着的UClass重复mixin。
 	// 使用弱引用是为了不阻止UClass GC；同路径UClass重新加载成新对象后，可以再次mixin。

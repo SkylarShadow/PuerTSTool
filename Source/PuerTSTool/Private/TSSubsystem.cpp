@@ -8,7 +8,12 @@
 #include "PuerTSToolLogChannels.h"
 #include "SourceFileWatcher.h"
 
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 6
+constexpr EInternalObjectFlags AutoMixinAsyncObjectFlags = EInternalObjectFlags_AsyncLoading | EInternalObjectFlags::Async;
+#else
 constexpr EInternalObjectFlags AutoMixinAsyncObjectFlags = EInternalObjectFlags::AsyncLoading | EInternalObjectFlags::Async;
+#endif
+
 DECLARE_STATS_GROUP(TEXT("TSSubsystem"), STATGROUP_TSSubsystem, STATCAT_Advanced);
 
 void UTSSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -155,6 +160,7 @@ bool UTSSubsystem::IsDS()
 	return GetGameInstance()->IsDedicatedServerInstance();
 }
 
+#if WITH_EDITOR
 void UTSSubsystem::HotReloadJavaScriptEnv(const FString& Path)
 {
 	puerts::FJsEnv* JsEnv = IPuertsModule::Get().GetJsEnv();
@@ -172,6 +178,7 @@ void UTSSubsystem::HotReloadJavaScriptEnv(const FString& Path)
 		}
 	}
 }
+#endif
 
 void UTSSubsystem::CacheClass(const UClass* _UClass)
 {
@@ -310,7 +317,7 @@ void UTSSubsystem::OnAutoMixinAsyncLoadingFlushUpdate()
 			}
 
 			UObject* Object = ObjectPtr.Get();
-			UClass* Class = Object->IsA<UClass>() ? Cast<UClass>(Object) : Object->GetClass();
+			UClass* Class = Object->IsA<UClass>() ? Cast<UClass>(Object) : Object->GetClass(); //TODO: !Object->IsA<UClass>()则return,不处理实例
 			if (!IsAutoMixinClassReady(Class))
 			{
 				// 类还处于异步加载/PostLoad/CDO初始化阶段，继续留在候选队列等待下一次flush。
@@ -362,7 +369,7 @@ void UTSSubsystem::TryAutoMixinClass(UClass* Class)
 		return;
 	}
 
-	const FString ClassPath = Class->GetPathName();
+	const FString ClassPath = Class->GetPathName(); //TODO: 尝试减少调用这个的开销，例如非目标类也可以记录下来，避免每个实例重复路径计算。
 
 	if (!m_autoMixinClassPaths.Contains(ClassPath))
 	{
