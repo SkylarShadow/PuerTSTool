@@ -10,7 +10,7 @@ enum class EPuertsCodeEditorType : uint8
 	/** Visual Studio Code */
 	VSCode,
 
-	/** 其他基于 VSCode 的编辑器（需手动指定可执行文件名） */
+	/** 其他编辑器（需手动指定可执行文件名） */
 	Custom
 };
     

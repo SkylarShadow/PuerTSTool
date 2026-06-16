@@ -9,6 +9,7 @@
 #include "PuerTSToolStyle.h"
 #include "PuerTSToolCommands.h"
 #include "Interfaces/IPluginManager.h"
+#include "PuerTSToolLogChannels.h"
 
 
 #define LOCTEXT_NAMESPACE "FPuerTSToolEditorModule"
@@ -126,7 +127,7 @@ void FPuerTSToolEditorModule::DeployPuerTSFramework() const
 		PlatformFile.CopyFile(*DestFile, *SrcFile);
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("Deploy PuerTS Framework Done (with ignore rules)"));
+	UE_LOG(LogPuerTSToolEditor, Log, TEXT("Deploy PuerTS Framework Done (with ignore rules)"));
 }
 
 

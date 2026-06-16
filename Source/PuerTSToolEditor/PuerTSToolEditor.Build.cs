@@ -41,9 +41,10 @@ public class PuerTSToolEditor : ModuleRules
 				"SlateCore",
 				"Projects",
 				"DeclarationGenerator",
-				
+				"PuerTSTool",	
 				// 生成TS模板用到的模块，可以的话尽量不添加模块，在设置配置就好
-				"UMG",	
+				"UMG", 
+				
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

@@ -135,6 +135,56 @@ PuerTSTool扩展了一些常用功能，支持：
 * 右键或在蓝图编辑器点击生成TS脚本，自动生成对应TypeScirpt文件，并自动往PreMixin.ts添加import
 * 生成TypeScirpt文件后或已经生成再次点击上述按钮，可打开代码编辑器
 
+#### 自动mixin的链路
+```mermaid
+sequenceDiagram
+
+participant TS as TS @mixin
+participant Sub as UTSSubsystem
+participant UObject as UObject/UClass
+participant UE as Async Loading
+participant Puer as Puerts blueprint.mixin
+
+TS->>Sub: tsSubsys.PassTSFunctionAsEvent("ApplyAutoMixin")
+
+TS->>Sub: tsSubsys.RegisterAutoMixinClass(ClassPath)
+
+TS->>Sub: tsSubsys.RefreshAutoMixinLoadedClasses()
+
+Sub->>Sub: FindObject<UClass>(ClassPath)
+
+alt UE类加载早于TS mixin 绑定
+    Sub->>TS: ApplyAutoMixin(Class)
+    TS->>Puer: blueprint.mixin()
+end
+
+alt 监听UobjectCreated
+    Note over Sub: StartAutoMixinListen()
+
+    UE->>UObject: 创建UClass
+
+    UObject->>Sub: NotifyUObjectCreated()
+
+    Sub->>Sub: TryAutoMixin()
+
+    alt 非GameThread
+        Sub->>Sub: AddAutoMixinCandidate()
+    else GameThread
+        Sub->>Sub: TryAutoMixinClass()
+    end
+
+    loop AsyncLoadingFlush
+        UE->>Sub: OnAsyncLoadingFlushUpdate()
+
+        Sub->>Sub: IsAutoMixinClassReady()
+
+        alt Ready
+            Sub->>TS: ApplyAutoMixin(Class)
+            TS->>Puer: blueprint.mixin()
+        end
+    end
+end
+```
 
 
 #### QuickStart.ts
@@ -204,7 +254,7 @@ import "./Blueprints/BP_PlayerController";
         "**/Intermediate": true,
         "**/Plugins": true,
         "**/Saved": true,
-        "**/Builds": true,
+        "**/Build": true,
 
         "**/.vsconfig": true,
         "**/*.uproject": true,

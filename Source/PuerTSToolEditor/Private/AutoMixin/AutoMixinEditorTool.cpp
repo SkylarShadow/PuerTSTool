@@ -10,6 +10,7 @@
 #include "PuerTSToolSettings.h"
 #include "Interfaces/IPluginManager.h"
 #include "Framework/Notifications/NotificationManager.h"
+#include "PuerTSToolLogChannels.h"
 #include "Widgets/Notifications/SNotificationList.h"
 
 
@@ -100,7 +101,7 @@ void FAutoMixinEditorTool::GenerateTS(const UBlueprint * Blueprint)
 					RootRelativePath = TEXT(".");
 				}
 
-				UE_LOG(LogTemp, Log, TEXT("计算出的相对路径: %s"), *RootRelativePath);
+				UE_LOG(LogPuerTSToolEditor, Log, TEXT("计算出的相对路径: %s"), *RootRelativePath);
 
 				// 处理模板并生成ts文件内容
 				const FString TsContent = ProcessTemplate(TemplateContent, BlueprintPath, FileName, RootRelativePath);
@@ -143,7 +144,7 @@ void FAutoMixinEditorTool::GenerateTS(const UBlueprint * Blueprint)
 						{
 							ImportMixinTsContent += ImportStatement + TEXT("\n");
 							FFileHelper::SaveStringToFile(ImportMixinTsContent, *ImportMixinTs, FFileHelper::EEncodingOptions::ForceUTF8);
-							UE_LOG(LogTemp, Log, TEXT("Premixin.ts更新成功"));
+							UE_LOG(LogPuerTSToolEditor, Log, TEXT("Premixin.ts更新成功"));
 
 						}
 					}
@@ -152,7 +153,7 @@ void FAutoMixinEditorTool::GenerateTS(const UBlueprint * Blueprint)
 			else
 			{
 				// 如果模板文件不存在，记录警告
-				UE_LOG(LogTemp, Warning, TEXT("MixinTemplate.ts不存在"));
+				UE_LOG(LogPuerTSToolEditor, Warning, TEXT("MixinTemplate.ts不存在"));
 			}
 		}
 		else

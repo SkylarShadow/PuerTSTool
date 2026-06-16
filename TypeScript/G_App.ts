@@ -5,11 +5,12 @@ import AssetsManager from './Framework/Assets/AssetsManager';
 import ModuleManager from './Framework/Module/ModuleManager';
 import EventDispatcher from './Framework/Utils/EventDispatcher';
 import { ISingleton } from './Framework/Interface/ISingleton';
+import { ShutdownAutoMixin } from './Framework/Utils/mixin';
 
 //全局释放函数
-function GlobalDispose(eventName, eventData) {
+function GlobalRelease(eventName, eventData) {
     G_App.GetInstance().Destroy();
-    console.log("GlobalDispose");
+    console.log("GlobalRelease");
 }
 
 //全局APP
@@ -27,7 +28,7 @@ export class G_App extends EventDispatcher implements ISingleton<G_App> {
         this.InitModule();
 
         let pTSSubSys = Misc.GetTSSubsys();
-        pTSSubSys.PassTSFunctionAsEvent("DisposeTS", toManualReleaseDelegate(GlobalDispose));
+        pTSSubSys.PassTSFunctionAsEvent("ReleaseTS", toManualReleaseDelegate(GlobalRelease));
         pTSSubSys.OnTSFunction.Bind((eventName, eventData) => { this.OnUECallTS(eventName, eventData); });
 
         setTimeout(() => {
@@ -43,11 +44,12 @@ export class G_App extends EventDispatcher implements ISingleton<G_App> {
     //销毁
     public Destroy(): void {
         this.RemoveAllEventListeners();
-        this.DisposeModule();
+        this.DestroyModule();
         AssetsManager.getInstance().Destroy();
-        
+        ShutdownAutoMixin();
+
         //释放TS函数,防止内存泄漏
-        releaseManualReleaseDelegate(GlobalDispose);
+        releaseManualReleaseDelegate(GlobalRelease);
         G_App.m_instance = null;
 
         console.log("G_App destroy");
@@ -83,7 +85,7 @@ export class G_App extends EventDispatcher implements ISingleton<G_App> {
     }
 
     //销毁模块
-    private DisposeModule(): void {
+    private DestroyModule(): void {
         //所有TS模块放在这里销毁
         ModuleManager.GetInstance().Destroy();
     }
