@@ -12,7 +12,7 @@ export default class Misc {
 
     //获取错误码文本
     static GetErrorCodeText(_strKey: string): string {
-        let str = UE.KismetTextLibrary.TextFromStringTable("/Game/PuerTSTool/DataTable/ST_ErrorCode.ST_ErrorCode", _strKey);
+        let str = UE.KismetTextLibrary.TextFromStringTable("/Plugins/PuerTSTool/DataTable/ST_ErrorCode.ST_ErrorCode", _strKey);
         return str;
     }
 

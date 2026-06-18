@@ -1,0 +1,26 @@
+{
+    "name": "metagame",
+    "version": "1.0.0",
+    "description": "UE5_Puerts",
+    "main": "index.js",
+    "scripts": {
+        "format": "prettier --write .",
+        "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+        "type-check": "tsc --noEmit",
+        "dev": "vite build --watch",
+        "build": "vite build",
+        "watch": "tsc -p tsconfig.json --watch"
+    },
+    "author": "Skylar",
+    "license": "ISC",
+    "devDependencies": {
+        "typescript": "^5.5.4",
+	    "@types/node": "^20.0.0"
+    },
+    "dependencies": {
+        "source-map": "^0.7.6",
+        "source-map-support": "^0.5.21",
+        "puerts-editor": "file:./Content/JavaScript/PuertsEditor"
+    },
+    "private": true
+}
