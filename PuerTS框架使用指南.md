@@ -82,7 +82,42 @@ PuertsModule.cpp:
 
  ### TypeScript工程编译
 
- #### 第一种方式：在项目设置的Puerts中启用Puerts插件自带的编译脚本，通过V8虚拟机执行编译，并且在UE编辑器运行期间会对Typescript目录进行监听，一旦有文件修改便会自动进行编译。如下图所示：
+
+PuerTSTool插件中有一个Package.json,复制到项目根目录执行
+```shell
+npm install
+```
+
+
+以下内容是不推荐的全局安装方式：
+在安装了nodejs的情况下，全局安装typescript和ts-node
+```sh
+npm install -g typescript
+npm install ts-node -g
+```
+查看版本，如果有输出则安装成功
+![](./Resources/tsenvv.png)
+
+直接在项目根目录下打开cmd，输入
+```sh
+tsc -p tsconfig.json
+```
+如有报错解决即可。
+#### 第一种方式：手动编译
+```shell
+node_modules\.bin\tsc -p tsconfig.json
+```
+或者监听，修改保存ts文件后自动编译：
+```shell
+node_modules\.bin\tsc -watch
+```
+
+#### 自动编译
+TODO:
+
+
+### 热刷
+#### 第一种方式：在项目设置的Puerts中启用Puerts插件自带的编译脚本，通过V8虚拟机执行编译，并且在UE编辑器运行期间会对Typescript目录进行监听，一旦有文件修改便会自动进行编译。如下图所示：
 ![](./Resources/puertsautocompile.png)
 
 启动自动编译后，工程目录会多出一个ts_file_versions_info.json，该文件用于记录.ts文件的md5进行对比，不一样则触发编译。
@@ -100,24 +135,11 @@ PuertsModule.cpp:
 
 
 
-*** 注意！JS热刷只能热刷部分代码片段，例如函数体，已经new出来的部分成员属性是没法热更的！开启热刷的时候无法断点调试，这是为了防止热刷代码调试定位错误而强制二选一的，自己按需开启。 ***
+***注意！JS热刷只能热刷部分代码片段，例如函数体，已经new出来的部分成员属性是没法热更的！开启热刷的时候无法断点调试，这是为了防止热刷代码调试定位错误而强制二选一的，自己按需开启。***
 
-#### 第二种方式：手动编译（不支持热刷）
-在安装了nodejs的情况下，全局安装typescript和ts-node
-```sh
-npm install -g typescript
-npm install ts-node -g
-```
-查看版本，如果有输出则安装成功
-![](./Resources/tsenvv.png)
 
-直接在项目根目录下打开cmd，输入
-```sh
-tsc -p tsconfig.json
-```
-如有报错解决即可。
 
-#### 第三种方式：使用命令热刷TS
+#### 第二种方式：使用命令热刷TS（应该没什么必要用）
 可参考https://github.com/puerts/v8-hot-reload-kit
 
 
