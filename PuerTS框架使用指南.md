@@ -268,6 +268,7 @@ import "./Blueprints/BP_PlayerController";
      "files.exclude": {
         "**/.git": true,
         "**/.svn": true,
+        "**/.idea": true,
         "**/.vs": true,
         "**/Binaries": true,
         "**/Config": true, 
