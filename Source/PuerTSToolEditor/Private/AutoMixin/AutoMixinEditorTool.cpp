@@ -1,21 +1,21 @@
 #include "AutoMixin/AutoMixinEditorTool.h"
-#include "Engine/Blueprint.h"
-#include "Misc/FileHelper.h"
-#include "Misc/Paths.h"
-#include "HAL/PlatformFileManager.h"
-#include "HAL/PlatformProcess.h"
-#include "Misc/MessageDialog.h"
-#include "UObject/Package.h"
+
+#include "AutoMixinUtils.h"
 #include "Editor.h"
-#include "PuerTSToolSettings.h"
-#include "Interfaces/IPluginManager.h"
+#include "Engine/Blueprint.h"
 #include "Framework/Notifications/NotificationManager.h"
+#include "HAL/FileManager.h"
+#include "HAL/PlatformProcess.h"
+#include "Interfaces/IPluginManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/MessageDialog.h"
+#include "Misc/Paths.h"
 #include "PuerTSToolLogChannels.h"
+#include "PuerTSToolSettings.h"
 #include "Widgets/Notifications/SNotificationList.h"
 
 
 #define LOCTEXT_NAMESPACE "FPuerTSToolEditorModule"
-
 
 FAutoMixinEditorTool::FAutoMixinEditorTool()
 {
@@ -33,171 +33,155 @@ void FAutoMixinEditorTool::BindCommands()
 {
 }
 
-
-
-void FAutoMixinEditorTool::GenerateTS(const UBlueprint * Blueprint)
+void FAutoMixinEditorTool::GenerateTS(const UBlueprint* Blueprint)
 {
-	const UPuerTSToolSettings* Settings = GetDefault<UPuerTSToolSettings>();
-	
-	if (Blueprint)
+	if (!Blueprint)
 	{
-		// 获取蓝图的路径名称
-		const FString BlueprintPath = Blueprint->GetPathName();
-		FString Lefts, Rights;
-		BlueprintPath.Split(".", &Lefts, &Rights);
+		return;
+	}
 
-		TArray<FString> OutStrings;
-		Lefts.ParseIntoArray(OutStrings,TEXT("/"), true);
+	const UPuerTSToolSettings* Settings = GetDefault<UPuerTSToolSettings>();
+	const FString BlueprintPath = Blueprint->GetPathName();
 
-		// 实际路径
-		FString ActualPath;
+	AutoMixinUtils::FTsPathInfo PathInfo;
+	if (!AutoMixinUtils::TryBuildTsPathInfo(Blueprint, PathInfo))
+	{
+		UE_LOG(LogPuerTSToolEditor, Warning, TEXT("Blueprint path parse failed: %s"), *BlueprintPath);
+		return;
+	}
 
-		if (OutStrings[0] == "Game")ActualPath = Lefts.Mid(5);
-		else ActualPath = Lefts;
+	const FString PreMixinFilePath = AutoMixinUtils::GetPreMixinFilePath();
 
-		// ts文件路径
-		FString TsFilePath = FString(TEXT("TypeScript")) + ActualPath;
-		TsFilePath = FPaths::Combine(FPaths::ProjectDir(), *(TsFilePath + ".ts"));
+	// 如果 TS 文件已经存在，只需要修复/确认 PreMixin import，然后打开文件。
+	if (FPaths::FileExists(PathInfo.TsFilePath))
+	{
+		AutoMixinUtils::EnsurePreMixinImport(PreMixinFilePath, PathInfo.ImportPath);
+		OpenCodeEditorForBpTS(PathInfo.TsFilePath);
+		return;
+	}
 
-		// 如果ts文件不存在，则创建它
-		if (!FPaths::FileExists(TsFilePath))
+	// 解析蓝图对象名作为模板里的 TS_NAME。
+	FString PackagePath;
+	FString ObjectName;
+	BlueprintPath.Split(TEXT("."), &PackagePath, &ObjectName);
+	if (ObjectName.IsEmpty())
+	{
+		ObjectName = Blueprint->GetName();
+	}
+
+	TArray<FString> NameParts;
+	ObjectName.ParseIntoArray(NameParts, TEXT("/"), false);
+	const FString FileName = NameParts.IsEmpty() ? ObjectName : NameParts.Last();
+
+	const FString TemplateFileName = FindTemplateForBlueprint(Blueprint);
+	const FString TemplatePath = FPaths::Combine(
+		IPluginManager::Get().FindPlugin("PuerTSTool")->GetBaseDir(),
+		Settings->TemplateDir,
+		TemplateFileName
+	);
+
+	FString TemplateContent;
+	if (!FFileHelper::LoadFileToString(TemplateContent, *TemplatePath))
+	{
+		UE_LOG(LogPuerTSToolEditor, Warning, TEXT("MixinTemplate.ts不存在"));
+		return;
+	}
+
+	const FString TypeScriptRootPath = AutoMixinUtils::GetTypeScriptRootPath();
+	const FString TsFileDir = FPaths::GetPath(PathInfo.TsFilePath);
+
+	// 计算从当前 TS 文件目录回到 TypeScript 根目录的相对路径，用于模板里的 ROOT_PATH。
+	// MakePathRelativeTo 要求目录路径带尾部斜杠，否则同名目录场景可能算错。
+	FString RootRelativePath = TypeScriptRootPath / TEXT("");
+	const FString TsFileDirWithSlash = TsFileDir / TEXT("");
+	if (FPaths::MakePathRelativeTo(RootRelativePath, *TsFileDirWithSlash))
+	{
+		RootRelativePath.RemoveFromEnd(TEXT("/"));
+		if (RootRelativePath.IsEmpty())
 		{
-			// 解析蓝图路径以获取文件名
-			TArray<FString> StringArray;
-			Rights.ParseIntoArray(StringArray,TEXT("/"), false);
-			const FString FileName = StringArray[StringArray.Num() - 1];
-			
-			const FString TemplateFileName = FindTemplateForBlueprint(Blueprint);
-			// 读取模板文件
-			const FString TemplatePath = FPaths::Combine(
-				IPluginManager::Get().FindPlugin("PuerTSTool")->GetBaseDir(), 
-				Settings->TemplateDir, TemplateFileName);
-			FString TemplateContent;
-			if (FFileHelper::LoadFileToString(TemplateContent, *TemplatePath))
-			{
-
-
-				const FString TypeScriptRootPath = FPaths::Combine(FPaths::ProjectDir(), Settings->TypeScriptDir);
-				const FString TsFileDir = FPaths::GetPath(TsFilePath);
-				
-				// 计算从TS文件目录到TypeScript根目录的相对路径
-				// 需要在目录路径后添加 "/" 以确保 MakePathRelativeTo 正确工作
-				FString RootRelativePath = TypeScriptRootPath / TEXT("");
-				const FString TsFileDirWithSlash = TsFileDir / TEXT("");
-				
-				if (FPaths::MakePathRelativeTo(RootRelativePath, *TsFileDirWithSlash))
-				{
-					// 移除末尾的斜杠（如果有）
-					RootRelativePath.RemoveFromEnd(TEXT("/"));
-					// 如果路径为空，说明在同一目录
-					if (RootRelativePath.IsEmpty())
-					{
-						RootRelativePath = TEXT(".");
-					}
-				}
-				else
-				{
-					// 如果计算失败，使用默认值
-					RootRelativePath = TEXT(".");
-				}
-
-				UE_LOG(LogPuerTSToolEditor, Log, TEXT("计算出的相对路径: %s"), *RootRelativePath);
-
-				// 处理模板并生成ts文件内容
-				const FString TsContent = ProcessTemplate(TemplateContent, BlueprintPath, FileName, RootRelativePath);
-				// 保存生成的内容到文件
-				if (FFileHelper::SaveStringToFile(TsContent, *TsFilePath, FFileHelper::EEncodingOptions::ForceUTF8))
-				{
-					// 显示通知
-					FNotificationInfo Info(FText::Format(LOCTEXT("TsFileGenerated", "TS文件生成成功->路径{0}"), FText::FromString(TsFilePath)));
-					Info.ExpireDuration = 12.f;
-					
-					Info.Hyperlink = FSimpleDelegate::CreateLambda([TsFilePath]()
-					{
-						OpenCodeEditorForBpTS(TsFilePath);
-					});
-
-					// 超链接显示文字
-					Info.HyperlinkText = LOCTEXT("Open TS File In Code Editor", "在代码编辑器中打开TypeScript文件");
-
-					
-					FSlateNotificationManager::Get().AddNotification(Info);
-					
-					OpenCodeEditorForBpTS(TsFilePath);
-					
-					// 生成Puerts类型定义
-					if (GEditor)
-					{
-						GEditor->Exec(nullptr, TEXT("Puerts.Gen"), *GLog);
-					}
-					
-					// 更新premixin文件
-					const FString ImportMixinTs = FPaths::Combine(FPaths::ProjectDir(), Settings->TypeScriptDir, Settings->ImportMixinFileName);
-					FString ImportMixinTsContent;
-
-					// 读取现有内容
-					if (FFileHelper::LoadFileToString(ImportMixinTsContent, *ImportMixinTs))
-					{
-						// 确保没有重复的导入语句
-						const FString ImportStatement = TEXT("import \"./") + ActualPath.Mid(1) + "\";";
-						if (!ImportMixinTsContent.Contains(ImportStatement))
-						{
-							ImportMixinTsContent += ImportStatement + TEXT("\n");
-							FFileHelper::SaveStringToFile(ImportMixinTsContent, *ImportMixinTs, FFileHelper::EEncodingOptions::ForceUTF8);
-							UE_LOG(LogPuerTSToolEditor, Log, TEXT("Premixin.ts更新成功"));
-
-						}
-					}
-				}
-			}
-			else
-			{
-				// 如果模板文件不存在，记录警告
-				UE_LOG(LogPuerTSToolEditor, Warning, TEXT("MixinTemplate.ts不存在"));
-			}
-		}
-		else
-		{
-			OpenCodeEditorForBpTS(TsFilePath);
+			RootRelativePath = TEXT(".");
 		}
 	}
+	else
+	{
+		RootRelativePath = TEXT(".");
+	}
+
+	UE_LOG(LogPuerTSToolEditor, Log, TEXT("计算出的相对路径: %s"), *RootRelativePath);
+
+	const FString TsContent = ProcessTemplate(TemplateContent, BlueprintPath, FileName, RootRelativePath);
+
+	// 目标目录可能不存在，先递归创建，避免 SaveStringToFile 因目录缺失失败。
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(PathInfo.TsFilePath), true);
+	if (!FFileHelper::SaveStringToFile(TsContent, *PathInfo.TsFilePath, FFileHelper::EEncodingOptions::ForceUTF8))
+	{
+		return;
+	}
+
+	FNotificationInfo Info(FText::Format(LOCTEXT("TsFileGenerated", "TS文件生成成功->路径{0}"), FText::FromString(PathInfo.TsFilePath)));
+	Info.ExpireDuration = 12.f;
+	Info.Hyperlink = FSimpleDelegate::CreateLambda([TsFilePath = PathInfo.TsFilePath]()
+	{
+		OpenCodeEditorForBpTS(TsFilePath);
+	});
+	Info.HyperlinkText = LOCTEXT("Open TS File In Code Editor", "在代码编辑器中打开TypeScript文件");
+	FSlateNotificationManager::Get().AddNotification(Info);
+
+	OpenCodeEditorForBpTS(PathInfo.TsFilePath);
+
+	// 生成 PuerTS 类型定义。
+	if (GEditor)
+	{
+		GEditor->Exec(nullptr, TEXT("Puerts.Gen"), *GLog);
+	}
+
+	// 更新 PreMixin，确保新生成的 mixin 会被加载。
+	AutoMixinUtils::EnsurePreMixinImport(PreMixinFilePath, PathInfo.ImportPath);
 }
 
-
-// 处理模板
+// 处理模板内容，替换占位符。
 FString FAutoMixinEditorTool::ProcessTemplate(const FString& TemplateContent, FString BlueprintPath, const FString& FileName, const FString& RootRelativePath)
 {
 	FString Result = TemplateContent;
 
-	// 获取蓝图完整类名（包括_C后缀）
+	// 获取蓝图完整类名（包括 _C 后缀）。
 	BlueprintPath += TEXT("_C");
 	const FString BlueprintClass = TEXT("UE") + BlueprintPath.Replace(TEXT("/"), TEXT("."));
 
-	const FString ROOT_PATH = TEXT("%ROOT_PATH%"); // 脚本根目录路径
-	const FString BLUEPRINT_PATH = TEXT("%BLUEPRINT_PATH%"); // 蓝图路径
-	const FString MIXIN_BLUEPRINT_TYPE = TEXT("%MIXIN_BLUEPRINT_TYPE%"); // 混入蓝图类型
-	const FString TS_NAME = TEXT("%TS_NAME%"); // TS文件名
+	const FString ROOT_PATH = TEXT("%ROOT_PATH%"); // 脚本根目录路径。
+	const FString BLUEPRINT_PATH = TEXT("%BLUEPRINT_PATH%"); // 蓝图路径。
+	const FString MIXIN_BLUEPRINT_TYPE = TEXT("%MIXIN_BLUEPRINT_TYPE%"); // 混入蓝图类型。
+	const FString TS_NAME = TEXT("%TS_NAME%"); // TS 文件名。
 
-	Result = Result.Replace(*ROOT_PATH, *RootRelativePath); // 替换 脚本根目录路径
-	Result = Result.Replace(*BLUEPRINT_PATH, *BlueprintPath); // 替换 蓝图路径
-	Result = Result.Replace(*MIXIN_BLUEPRINT_TYPE, *BlueprintClass); // 替换 混入蓝图类型
-	Result = Result.Replace(*TS_NAME, *FileName); // 替换 TS文件名
+	Result = Result.Replace(*ROOT_PATH, *RootRelativePath); // 替换脚本根目录路径。
+	Result = Result.Replace(*BLUEPRINT_PATH, *BlueprintPath); // 替换蓝图路径。
+	Result = Result.Replace(*MIXIN_BLUEPRINT_TYPE, *BlueprintClass); // 替换混入蓝图类型。
+	Result = Result.Replace(*TS_NAME, *FileName); // 替换 TS 文件名。
 
 	return Result;
 }
 
 FString FAutoMixinEditorTool::FindTemplateForBlueprint(const UBlueprint* Blueprint)
-{	
+{
 	const UPuerTSToolSettings* Settings = GetDefault<UPuerTSToolSettings>();
-	if (!Blueprint) return Settings->DefaultTemplateName; // fallback
+	if (!Blueprint)
+	{
+		return Settings->DefaultTemplateName;
+	}
 
 	UClass* BPClass = Blueprint->GeneratedClass;
-	if (!BPClass) return Settings->DefaultTemplateName;
+	if (!BPClass)
+	{
+		return Settings->DefaultTemplateName;
+	}
 
 	for (const FPuerTSTemplateMapping& Mapping : Settings->TemplateMappings)
 	{
 		UClass* BaseClass = Mapping.BaseClass.LoadSynchronous();
-		if (!BaseClass) continue;
+		if (!BaseClass)
+		{
+			continue;
+		}
 
 		if (BPClass->IsChildOf(BaseClass))
 		{
@@ -205,7 +189,7 @@ FString FAutoMixinEditorTool::FindTemplateForBlueprint(const UBlueprint* Bluepri
 		}
 	}
 
-	// fallback 默认模板
+	// fallback 默认模板。
 	return Settings->DefaultTemplateName;
 }
 
@@ -216,7 +200,7 @@ void FAutoMixinEditorTool::OpenCodeEditorForBpTS(const FString& TsFilePath)
 	{
 		return;
 	}
-	
+
 	if (TsFilePath.IsEmpty())
 	{
 		FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("TsFilePath is empty")));
@@ -234,8 +218,6 @@ void FAutoMixinEditorTool::OpenCodeEditorForBpTS(const FString& TsFilePath)
 		return;
 	}
 
-	
-	
 	const FString EditorCommand = Settings->GetCodeEditorCommand();
 	const EPuertsCodeEditorType EditorType = Settings->PuertsCodeEditorType;
 
@@ -262,7 +244,7 @@ void FAutoMixinEditorTool::OpenCodeEditorForBpTS(const FString& TsFilePath)
 	}
 	else
 	{
-		// 自定义编辑器（只传路径）
+		// 自定义编辑器（只传路径）。
 		const FString CmdArgs = FString::Printf(TEXT("\"%s\""), *TsFilePath);
 
 		if (EditorCommand.EndsWith(TEXT(".cmd")) || EditorCommand.EndsWith(TEXT(".bat")))
