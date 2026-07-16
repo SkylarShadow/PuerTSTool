@@ -6,6 +6,7 @@
 #include "HAL/FileManager.h"
 #include "Misc/MessageDialog.h"
 #include "PuerTSToolStyle.h"
+#include "Styling/AppStyle.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/SBoxPanel.h"
@@ -98,12 +99,7 @@ namespace
 		}
 	}
 
-	// 一级菜单图标跟随状态变化。这里先约定 style key，图片资源可以后续再补。
-	// 建议后续在 PuerTSToolStyle.cpp 中注册以下 key：
-	// - PuerTSAutoMixinTool.NoTs
-	// - PuerTSAutoMixinTool.Bound
-	// - PuerTSAutoMixinTool.PreMixinError
-	// - PuerTSAutoMixinTool.NoBlueprint
+	// 一级菜单图标跟随状态变化
 	FName GetAutoMixinStatusIconName(const UBlueprint* Blueprint)
 	{
 		switch (GetAutoMixinStatus(Blueprint).Status)
@@ -189,10 +185,11 @@ void FAutoMixinBPToolBar::RegisterButton()
 		nullptr, // 不使用命令列表
 		FToolBarExtensionDelegate::CreateLambda([this](FToolBarBuilder& ToolbarBuilder)
 		{
-			// 一级菜单按钮只展示当前绑定状态；实际操作放到二级下拉菜单里。
-			// 使用自定义 SComboButton，是为了让图标也能像文字一样根据当前蓝图状态动态刷新。
+			// 使用自定义 SComboButton，为了让图标根据当前蓝图状态动态刷新。
 			ToolbarBuilder.AddWidget(
 				SNew(SComboButton)
+				.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
+				.ContentPadding(FMargin(4.f, 2.f))
 				.ToolTipText(TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateLambda([this]()
 				{
 					return GetAutoMixinStatusTooltip(GetActiveBlueprint());
@@ -294,7 +291,7 @@ void FAutoMixinBPToolBar::CheckAllTsMixin() const
 	const FString TypeScriptRootPath = AutoMixinUtils::GetTypeScriptRootPath();
 	const FString PreMixinFilePath = AutoMixinUtils::GetPreMixinFilePath();
 
-	// 检查分两边做：
+	// 检查
 	// 1. 从 PreMixin 出发，确认每个启用 import 都能找到对应 TS 文件。
 	//    这类问题通常来自 TS 文件被删除、移动、改名，但 PreMixin 还保留旧引用。
 	// 2. 从 TypeScript 目录出发，找所有包含 @mixin 的 TS 文件，确认它们都在 PreMixin 中启用。
