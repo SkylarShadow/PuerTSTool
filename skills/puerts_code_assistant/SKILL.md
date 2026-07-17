@@ -1,5 +1,5 @@
 ---
-name: puerts-coding-helper
+name: puerts-coding-assistant
 description: 协助用户在 Puerts + Unreal Engine 5 项目中定位 TypeScript 声明文件 (.d.ts) 并正确使用声明的 UE API 编写 TypeScript 代码。触发场景包括：(1) 用户询问某个 UE 类型/API 的 TS 声明文件在哪 (2) 用户不知道如何正确导入/使用 UE 容器类型 (TArray/TMap/TSet) (3) 用户需要编写 UE 装饰器 (UCLASS/UFUNCTION/UPROPERTY) (4) 用户遇到 TypeScript 编译错误提示找不到模块或类型 (5) 用户需要使用 Puerts 运行时 API ($ref/blueprint/toDelegate 等) 或 FFI 调用原生库。
 ---
 
@@ -68,6 +68,12 @@ Typing/
 4. **使用指导**：查阅 `ue` 模块中对应的类型声明和使用方式
 
 
+## 自动补全规则
+
+
+## 常见问题快速索引
+
+
 ## 官方文档
 [bug描述](./doc/bugs.md)
 [demo](./doc/demo.md)
@@ -76,5 +82,3 @@ Typing/
 [蓝图mixin功能原理、解析、使用方法](doc/mixin.md)
 [脚本调用引擎API](doc/script_call_uclass.md)
 [基于模板的静态绑定](doc/template_binding.md)
-
-## 常见问题快速索引
