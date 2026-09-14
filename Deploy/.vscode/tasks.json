@@ -1,0 +1,64 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "PuerTS: Fix TS Code",
+            "type": "npm",
+            "script": "fix",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "PuerTS: Check TS Code",
+            "type": "npm",
+            "script": "check",
+            "group": "test",
+            "problemMatcher": ["$tsc"]
+        },
+        {
+            "label": "PuerTS: Format TS Code",
+            "type": "npm",
+            "script": "format",
+            "problemMatcher": []
+        },
+        {
+            "label": "PuerTS: Lint TS Code",
+            "type": "npm",
+            "script": "lint",
+            "problemMatcher": []
+        },
+        {
+            "label": "PuerTS: Type Check",
+            "type": "npm",
+            "script": "type-check",
+            "problemMatcher": ["$tsc"]
+        },
+        {
+            "label": "PuerTS: Build TS",
+            "type": "npm",
+            "script": "build",
+            "group": "build",
+            "problemMatcher": ["$tsc"]
+        },
+        {
+            "label": "PuerTS: Watch TS",
+            "type": "npm",
+            "script": "watch",
+            "isBackground": true,
+            "problemMatcher": "$tsc-watch"
+        },
+        {
+            "label": "PuerTSTool: Check VSCode Bridge",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "Test-NetConnection 127.0.0.1 -Port 18777"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}
