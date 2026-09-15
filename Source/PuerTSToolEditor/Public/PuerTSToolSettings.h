@@ -57,13 +57,13 @@ public:
 	UPROPERTY(VisibleAnywhere, Config, Category = "PuerTSTool|AutoMixin", meta = (DisplayName = "Import Mixin File Name"))
 	FString ImportMixinFileName;
 	
-	// DoNotOverwritePaths 使用规则：
-	// 1. 相对于 PuertsFrameworkPath
+	// DoNotOverwritePaths 命中的目标文件已存在时不覆盖，目标文件不存在时仍会部署复制。
+	// 1. 相对于插件内 TypeScript 目录
 	// 2. 支持两种写法：
 	//    - 文件：App.ts
 	//    - 目录：Framework/ 或 Framework
 	// 3. 自动匹配子目录
-	UPROPERTY(EditAnywhere, Config, Category = "PuerTSTool|AutoMixin", meta = (DisplayName = "Framework Override WhiteList"))
+	UPROPERTY(EditAnywhere, Config, Category = "PuerTSTool|AutoMixin", meta = (DisplayName = "Framework Do Not Overwrite List"))
 	TArray<FString> DoNotOverwritePaths;
 	
 	UPROPERTY(EditAnywhere, Config, Category = "PuerTSTool|CodeEditor", meta = (DisplayName = "TypeScript Code Editor Type"))

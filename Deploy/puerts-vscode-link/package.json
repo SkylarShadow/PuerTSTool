@@ -13,7 +13,9 @@
     "activationEvents": [
         "onLanguage:typescript",
         "onCommand:puertsTool.openBlueprint",
-        "onCommand:puertsTool.revealBlueprint"
+        "onCommand:puertsTool.revealBlueprint",
+        "onCommand:puertsTool.peekTypeDeclaration",
+        "onCommand:puertsTool.openTypeDeclaration"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -25,6 +27,14 @@
             {
                 "command": "puertsTool.revealBlueprint",
                 "title": "PuerTS: Reveal Blueprint In Content Browser"
+            },
+            {
+                "command": "puertsTool.peekTypeDeclaration",
+                "title": "PuerTS: Peek Type Declaration"
+            },
+            {
+                "command": "puertsTool.openTypeDeclaration",
+                "title": "PuerTS: Open Type Declaration"
             }
         ],
         "configuration": {
@@ -39,6 +49,13 @@
                     "type": "number",
                     "default": 18777,
                     "description": "Port of the PuerTSTool editor TCP bridge."
+                },
+                "puertsTool.hoverPreviewMaxLines": {
+                    "type": "number",
+                    "default": 28,
+                    "minimum": 8,
+                    "maximum": 120,
+                    "description": "Maximum declaration lines shown in PuerTS hover previews before using Peek Declaration."
                 }
             }
         }

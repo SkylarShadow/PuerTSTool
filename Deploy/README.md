@@ -30,7 +30,20 @@ To skip dependency installation:
 DeployPuerTSEnv.bat D:\Path\To\YourUEProject --no-install
 ```
 
-The script follows the deploy flow in `PuerTS框架使用指南.md` where possible: it checks Node/npm, warns when `TypeScript` or `tsconfig.json` is missing, copies the TS engineering files, and prints the remaining manual Puerts steps such as `enable_puerts_module.js`, GenDTS, backend/V8 checks, and packaging settings.
+The script follows `PuerTS框架使用指南.md` step by step. It does not silently skip required deployment stages:
+
+1. Locates the UE project root by walking upward until it finds a `.uproject`, or asks for the path.
+2. Checks Node.js and npm.
+3. Looks for Puerts at `<ProjectRoot>/Plugins/puerts` or `<ProjectRoot>/Plugins/Puerts`; if neither exists, asks for the Puerts plugin directory.
+4. Runs `node enable_puerts_module.js`.
+5. Verifies that `TypeScript` and `tsconfig.json` exist.
+6. Copies the TS engineering config files.
+7. Runs `npm install` by default.
+8. Stops for manual confirmation of backend/V8 and `GetJsEnv` patch steps.
+9. Stops for manual confirmation that the UE project was compiled and GenDTS was run.
+10. Runs `npm run check`.
+
+Manual UE-only steps are shown in order and require confirmation before the script continues.
 
 Then run the checks:
 

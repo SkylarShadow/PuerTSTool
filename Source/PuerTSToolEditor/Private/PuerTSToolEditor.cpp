@@ -67,7 +67,7 @@ void FPuerTSToolEditorModule::DeployPuerTSFramework() const
 		PlatformFile.CreateDirectoryTree(*TargetDir);
 	}
 
-	TArray<FString> IgnoreList = Settings->DoNotOverwritePaths;
+	TArray<FString> DoNotOverwriteList = Settings->DoNotOverwritePaths;
 
 	// 遍历源目录
 	TArray<FString> Files;
@@ -84,21 +84,28 @@ void FPuerTSToolEditorModule::DeployPuerTSFramework() const
 		FString NormalizedPath = RelativePath;
 		FPaths::NormalizeFilename(NormalizedPath);
 		
-		// 判断是否在忽略列表
-		bool bSkip = false;
-		for (FString Ignore : IgnoreList)
+		// 不覆盖列表，目标文件已存在时跳过，缺失时复制。
+		bool bDoNotOverwrite = false;
+		for (FString DoNotOverwritePath : DoNotOverwriteList)
 		{
-			FPaths::NormalizeFilename(Ignore);
+			DoNotOverwritePath.TrimStartAndEndInline();
+			if (DoNotOverwritePath.IsEmpty())
+			{
+				continue;
+			}
+
+			FPaths::NormalizeFilename(DoNotOverwritePath);
 
 			// 目录匹配（以 / 结尾 或 不含 .）
-			bool bIsDir = Ignore.EndsWith("/") || !Ignore.Contains(".");
+			bool bIsDir = DoNotOverwritePath.EndsWith("/") || !DoNotOverwritePath.Contains(".");
 
 			if (bIsDir)
 			{
 				// 确保是完整目录匹配
-				if (NormalizedPath.StartsWith(Ignore))
+				DoNotOverwritePath.RemoveFromEnd(TEXT("/"));
+				if (NormalizedPath.Equals(DoNotOverwritePath) || NormalizedPath.StartsWith(DoNotOverwritePath + TEXT("/")))
 				{
-					bSkip = true;
+					bDoNotOverwrite = true;
 					break;
 				}
 			}
@@ -107,15 +114,15 @@ void FPuerTSToolEditorModule::DeployPuerTSFramework() const
 				// 文件名匹配
 				FString FileName = FPaths::GetCleanFilename(NormalizedPath);
 
-				if (FileName.Equals(Ignore))
+				if (FileName.Equals(DoNotOverwritePath))
 				{
-					bSkip = true;
+					bDoNotOverwrite = true;
 					break;
 				}
 			}
 		}
 
-		if (bSkip)
+		if (bDoNotOverwrite && PlatformFile.FileExists(*DestFile))
 		{
 			continue;
 		}
@@ -131,7 +138,7 @@ void FPuerTSToolEditorModule::DeployPuerTSFramework() const
 		PlatformFile.CopyFile(*DestFile, *SrcFile);
 	}
 
-	UE_LOG(LogPuerTSToolEditor, Log, TEXT("Deploy PuerTS Framework Done (with ignore rules)"));
+	UE_LOG(LogPuerTSToolEditor, Log, TEXT("Deploy PuerTS Framework Done (with do-not-overwrite rules)"));
 }
 
 

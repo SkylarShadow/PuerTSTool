@@ -36,6 +36,14 @@ export default tseslint.config(
                     varsIgnorePattern: "^_",
                 },
             ],
+            "@typescript-eslint/naming-convention": [
+                "warn",
+                {
+                    selector: ["variable", "parameter"],
+                    format: ["camelCase"],
+                    leadingUnderscore: "allow",
+                },
+            ],
         },
     },
     prettier,

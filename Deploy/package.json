@@ -4,8 +4,8 @@
     "description": "UE5_Puerts",
     "main": "index.js",
     "scripts": {
-        "format": "prettier --write \"TypeScript/**/*.ts\" \"*.{json,js,mjs}\"",
-        "format:check": "prettier --check \"TypeScript/**/*.ts\" \"*.{json,js,mjs}\"",
+        "format": "prettier --write \"TypeScript/**/*.ts\"",
+        "format:check": "prettier --check \"TypeScript/**/*.ts\"",
         "lint": "eslint TypeScript --fix",
         "lint:check": "eslint TypeScript",
         "type-check": "tsc --noEmit",
