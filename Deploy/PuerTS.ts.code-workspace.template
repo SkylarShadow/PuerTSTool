@@ -1,0 +1,215 @@
+{
+    "folders": [
+        {
+            "name": "PuerTS",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "eslint.workingDirectories": [
+            {
+                "directory": ".",
+                "changeProcessCWD": true
+            }
+        ],
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": false,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+        },
+        "files.exclude": {
+            "**/.git": true,
+            "**/.idea": true,
+            "**/.svn": true,
+            "**/.vs": true,
+            "**/.vsconfig": true,
+            "**/.codex": true,
+            "**/*.bat": true,
+            "**/*.sln": true,
+            "**/*.uproject": true,
+            "**/node_modules": true,
+            "**/Binaries": true,
+            "**/Build": true,
+            "**/Config": true,
+            "**/Content": true,
+            "**/DerivedDataCache": true,
+            "**/Intermediate": true,
+            "**/Pack": true,
+            "**/Plugins": true,
+            "**/Python": true,
+            "**/Saved": true,
+            "**/Source": true,
+            "**/ts_file_versions_info.json": true,
+            "**/tsconfig.json": true
+        },
+        "search.exclude": {
+            "**/.git": true,
+            "**/.idea": true,
+            "**/.svn": true,
+            "**/.vs": true,
+            "**/.vsconfig": true,
+            "**/*.bat": true,
+            "**/*.sln": true,
+            "**/*.uproject": true,
+            "**/node_modules": true,
+            "**/Binaries": true,
+            "**/Build": true,
+            "**/Config": true,
+            "**/Content": true,
+            "**/DerivedDataCache": true,
+            "**/Intermediate": true,
+            "**/Pack": true,
+            "**/Plugins": true,
+            "**/Python": true,
+            "**/Saved": true,
+            "**/Source": true,
+            "**/ts_file_versions_info.json": true,
+            "**/tsconfig.json": true
+        }
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "PuerTS: Fix TS Code",
+                "detail": "Run ESLint auto-fix and Prettier formatting for TypeScript source files.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "fix"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "group": "build",
+                "problemMatcher": []
+            },
+            {
+                "label": "PuerTS: Check TS Code",
+                "detail": "Run the full pre-submit check: TypeScript type-check, ESLint check, and Prettier format check.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "check"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "group": "test",
+                "problemMatcher": ["$tsc"]
+            },
+            {
+                "label": "PuerTS: Format TS Code",
+                "detail": "Format TypeScript source files with Prettier. This task writes changes to files.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "format"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "problemMatcher": []
+            },
+            {
+                "label": "PuerTS: Check Format",
+                "detail": "Check whether TypeScript source files match Prettier formatting without modifying files.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "format:check"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "problemMatcher": []
+            },
+            {
+                "label": "PuerTS: Lint TS Code",
+                "detail": "Run ESLint with auto-fix on the TypeScript folder. This task may modify files.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "lint"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "problemMatcher": []
+            },
+            {
+                "label": "PuerTS: Check Lint",
+                "detail": "Run ESLint on the TypeScript folder in check-only mode without modifying files.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "lint:check"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "problemMatcher": []
+            },
+            {
+                "label": "PuerTS: Type Check",
+                "detail": "Run tsc --noEmit to validate TypeScript types without generating JavaScript.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "type-check"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "problemMatcher": ["$tsc"]
+            },
+            {
+                "label": "PuerTS: Build TS",
+                "detail": "Compile TypeScript once and emit JavaScript to Content/JavaScript for PuerTS runtime use.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "build"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "group": "build",
+                "problemMatcher": ["$tsc"]
+            },
+            {
+                "label": "PuerTS: Watch TS",
+                "detail": "Keep tsc running in watch mode and recompile TypeScript to Content/JavaScript after file changes.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "watch"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "isBackground": true,
+                "problemMatcher": "$tsc-watch"
+            },
+            {
+                "label": "PuerTSTool: Check VSCode Bridge",
+                "detail": "Check whether the UE editor TCP bridge is reachable for Open Blueprint and Reveal In UE commands.",
+                "type": "shell",
+                "command": "powershell",
+                "args": [
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    "Test-NetConnection 127.0.0.1 -Port 18777"
+                ],
+                "problemMatcher": []
+            }
+        ]
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "PuerTS: Attach V8",
+                "type": "node",
+                "request": "attach",
+                "address": "127.0.0.1",
+                "port": 8080,
+                "skipFiles": [
+                    "<node_internals>/**"
+                ]
+            }
+        ]
+    },
+    "extensions": {
+        "recommendations": [
+            "dbaeumer.vscode-eslint",
+            "esbenp.prettier-vscode",
+            "puerts-tool.puerts-tool-vscode-link"
+        ]
+    }
+}

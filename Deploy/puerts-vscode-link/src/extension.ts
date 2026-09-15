@@ -1,7 +1,7 @@
 import * as net from "net";
 import * as vscode from "vscode";
 
-const assetPathPattern = /\bconst\s+AssetPath\s*=\s*["']([^"']+)["']/g;
+const assetPathPattern = /\b(?:const|let|var)\s+assetPath\b(?:\s*:\s*[^=;]+)?\s*=\s*["']([^"']+)["']/gi;
 
 type AssetPathMatch = {
     assetPath: string;

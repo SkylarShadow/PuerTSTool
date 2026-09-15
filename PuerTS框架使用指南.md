@@ -1,5 +1,22 @@
 # PuerTS及相关框架使用指南
 
+## 目录
+
+- [前言](#前言)
+	- [选型](#选型)
+- [部署教程](#部署教程)
+	- [0. 下载Nodejs](#0-下载nodejshttpsnodejsorgendownloadcurrent-并安装)
+	- [1. 下载部署Puerts](#1-下载部署puerts-非程序对应负责人不用看)
+	- [2.PuerTSTool编译](#2puertstool编译)
+	- [TypeScript工程环境部署](#typescript工程环境部署-非程序对应负责人不用看)
+	- [TypeScript编译](#typescript编译)
+	- [热刷](#热刷)
+	- [3.项目设置](#3项目设置)
+	- [4.TypeScript附带框架 and PuerTSTool](#4typescript附带框架-and-puertstool)
+	- [5.调试（VSCode调试在下文）](#5调试vscode调试在下文)
+	- [6.VSCode配合使用](#6vscode配合使用)
+	- [注意事项](#注意事项)
+
 ## 前言
 
 ### 选型
@@ -27,9 +44,9 @@
 node -v
 ```
 如果出现版本号提示则安装成功。
-### 1. 下载、部署PuerTS：
 
-### 1. 下载部署Puerts
+
+### 1. 下载部署Puerts （非程序对应负责人不用看）
 Puerts：https://github.com/Tencent/puerts 
 
 PuerTS辅助插件PuerTSTool:
@@ -80,7 +97,7 @@ PuertsModule.cpp:
 ![](./Resources/genuedts.png)
 
 
- ### TypeScript工程编译
+### TypeScript工程环境部署 （非程序对应负责人不用看）
 
 
 PuerTSTool插件中有一个Package.json,复制到项目根目录执行
@@ -98,11 +115,15 @@ npm install ts-node -g
 查看版本，如果有输出则安装成功
 ![](./Resources/tsenvv.png)
 
+
+### TypeScript编译
 直接在项目根目录下打开cmd，输入
 ```sh
 tsc -p tsconfig.json
 ```
 如有报错解决即可。
+
+
 #### 第一种方式：手动编译
 ```shell
 node_modules\.bin\tsc -p tsconfig.json

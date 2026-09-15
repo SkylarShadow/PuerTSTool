@@ -1,8 +1,8 @@
 {
     "name": "puerts-tool-vscode-link",
     "displayName": "PuerTS Tool Link",
-    "description": "Open Unreal Blueprint assets from PuerTS AssetPath constants.",
-    "version": "0.1.0",
+    "description": "Open Unreal Blueprint assets from PuerTS assetPath constants.",
+    "version": "0.1.1",
     "publisher": "puerts-tool",
     "engines": {
         "vscode": "^1.90.0"

@@ -4,7 +4,10 @@ setlocal EnableExtensions EnableDelayedExpansion
 set "SOURCE_DIR=%~dp0"
 set "TARGET_DIR="
 set "RUN_NPM_INSTALL=1"
+set "DEPLOY_WORKSPACE_ENV=ASK"
 set "PUERTS_DIR="
+set "PROJECT_NAME="
+set "WORKSPACE_FILE="
 set "PAUSE_ON_EXIT=1"
 set "EXIT_CODE=0"
 
@@ -27,6 +30,26 @@ if /I "%~1"=="--no-install" (
 )
 if /I "%~1"=="/no-install" (
     set "RUN_NPM_INSTALL=0"
+    shift
+    goto :ParseArgs
+)
+if /I "%~1"=="--workspace" (
+    set "DEPLOY_WORKSPACE_ENV=1"
+    shift
+    goto :ParseArgs
+)
+if /I "%~1"=="/workspace" (
+    set "DEPLOY_WORKSPACE_ENV=1"
+    shift
+    goto :ParseArgs
+)
+if /I "%~1"=="--no-workspace" (
+    set "DEPLOY_WORKSPACE_ENV=0"
+    shift
+    goto :ParseArgs
+)
+if /I "%~1"=="/no-workspace" (
+    set "DEPLOY_WORKSPACE_ENV=0"
     shift
     goto :ParseArgs
 )
@@ -77,10 +100,32 @@ if not exist "%TARGET_DIR%\*.uproject" (
     echo %TARGET_DIR%
     goto :failed
 )
+for %%F in ("%TARGET_DIR%\*.uproject") do if not defined PROJECT_NAME set "PROJECT_NAME=%%~nF"
+if "%PROJECT_NAME%"=="" (
+    echo [PuerTSTool] Could not resolve project name from .uproject.
+    goto :failed
+)
+set "WORKSPACE_FILE=%TARGET_DIR%\%PROJECT_NAME%.ts.code-workspace"
 echo [PuerTSTool] Project root: %TARGET_DIR%
+echo [PuerTSTool] Project name: %PROJECT_NAME%
 echo.
 
-call :Step "1" "Check Node.js and npm"
+call :Step "1" "VSCode workspace environment"
+call :PromptDeployWorkspace || goto :failed
+if "%DEPLOY_WORKSPACE_ENV%"=="1" (
+    if not exist "%SOURCE_DIR%PuerTS.ts.code-workspace.template" (
+        echo [PuerTSTool] Workspace template was not found:
+        echo %SOURCE_DIR%PuerTS.ts.code-workspace.template
+        goto :failed
+    )
+    copy /Y "%SOURCE_DIR%PuerTS.ts.code-workspace.template" "%WORKSPACE_FILE%" >nul || goto :copy_failed
+    echo [PuerTSTool] VSCode workspace: %WORKSPACE_FILE%
+) else (
+    echo [PuerTSTool] VSCode workspace environment deploy skipped.
+)
+echo.
+
+call :Step "2" "Check Node.js and npm"
 call :CheckCommand node "Node.js is required. Install Node.js first, then run this script again." || goto :failed
 call :CheckCommand npm "npm is required. Reinstall Node.js or check PATH." || goto :failed
 echo [PuerTSTool] Node version:
@@ -89,7 +134,7 @@ echo [PuerTSTool] npm version:
 call npm -v
 echo.
 
-call :Step "2" "Locate Puerts plugin under project Plugins"
+call :Step "3" "Locate Puerts plugin under project Plugins"
 call :ResolvePuertsDir "%TARGET_DIR%" PUERTS_DIR
 if "%PUERTS_DIR%"=="" (
     echo [PuerTSTool] Could not find Puerts at:
@@ -109,7 +154,7 @@ echo [PuerTSTool] Puerts enable script: %PUERTS_DIR%\enable_puerts_module.js
 echo [PuerTSTool] Node option: --preserve-symlinks-main
 echo.
 
-call :Step "3" "Run node enable_puerts_module.js"
+call :Step "4" "Run node enable_puerts_module.js"
 pushd "%PUERTS_DIR%" || goto :failed
 node --preserve-symlinks-main "%PUERTS_DIR%\enable_puerts_module.js"
 if errorlevel 1 (
@@ -121,7 +166,7 @@ popd
 echo [PuerTSTool] Puerts module deploy finished.
 echo.
 
-call :Step "4" "Verify generated TypeScript project files"
+call :Step "5" "Verify generated TypeScript project files"
 if not exist "%TARGET_DIR%\TypeScript" (
     echo [PuerTSTool] TypeScript directory was not found:
     echo %TARGET_DIR%\TypeScript
@@ -139,7 +184,7 @@ if not exist "%TARGET_DIR%\tsconfig.json" (
 echo [PuerTSTool] TypeScript and tsconfig.json found.
 echo.
 
-call :Step "5" "Copy TypeScript engineering config files"
+call :Step "6" "Copy TypeScript engineering config files"
 copy /Y "%SOURCE_DIR%package.json" "%TARGET_DIR%\package.json" >nul || goto :copy_failed
 copy /Y "%SOURCE_DIR%eslint.config.mjs" "%TARGET_DIR%\eslint.config.mjs" >nul || goto :copy_failed
 copy /Y "%SOURCE_DIR%.prettierrc" "%TARGET_DIR%\.prettierrc" >nul || goto :copy_failed
@@ -154,7 +199,7 @@ echo [PuerTSTool] Config files copied.
 echo [PuerTSTool] package.json: %TARGET_DIR%\package.json
 echo.
 
-call :Step "6" "Install npm dependencies"
+call :Step "7" "Install npm dependencies"
 if "%RUN_NPM_INSTALL%"=="1" (
     if not exist "%TARGET_DIR%\package.json" (
         echo [PuerTSTool] package.json is missing before npm install:
@@ -177,16 +222,20 @@ if "%RUN_NPM_INSTALL%"=="1" (
 )
 echo.
 
-call :Step "7" "Finish"
+call :Step "8" "Finish"
 echo [PuerTSTool] Deploy finished.
 echo.
 echo [PuerTSTool] Next manual steps when needed:
+if "%DEPLOY_WORKSPACE_ENV%"=="1" (
+    echo   - Open %PROJECT_NAME%.ts.code-workspace in VSCode for TypeScript and Typing focused development.
+) else (
+    echo   - Run this script again with --workspace if you want VSCode workspace and task files.
+)
 echo   - Compile the UE project, open the editor, and run GenDTS.
 echo   - Run npm run type-check to check TypeScript types.
 echo   - Run npm run check to run type-check, ESLint, and Prettier checks.
 echo   - Run npm run build to compile TypeScript into Content\JavaScript.
 echo   - For packaging, include Content\JavaScript in UE packaging settings.
-echo [PuerTSTool] This script does not copy .vscode\tasks.json. Copy %SOURCE_DIR%.vscode manually if you want VSCode task buttons.
 echo.
 set "EXIT_CODE=0"
 goto :ExitScript
@@ -206,6 +255,23 @@ where %~1 >nul 2>nul
 if errorlevel 1 (
     echo [PuerTSTool] %~2
     exit /b 1
+)
+exit /b 0
+
+:PromptDeployWorkspace
+if /I "%DEPLOY_WORKSPACE_ENV%"=="1" exit /b 0
+if /I "%DEPLOY_WORKSPACE_ENV%"=="0" exit /b 0
+
+echo [PuerTSTool] Deploy VSCode workspace environment?
+echo [PuerTSTool] This will create or update the workspace file:
+echo   %WORKSPACE_FILE%
+echo.
+set "DEPLOY_WORKSPACE_INPUT="
+set /p "DEPLOY_WORKSPACE_INPUT=Deploy VSCode workspace environment [Y,n]? "
+if /I "%DEPLOY_WORKSPACE_INPUT%"=="N" (
+    set "DEPLOY_WORKSPACE_ENV=0"
+) else (
+    set "DEPLOY_WORKSPACE_ENV=1"
 )
 exit /b 0
 
