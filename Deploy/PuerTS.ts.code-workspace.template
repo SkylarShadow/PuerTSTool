@@ -163,6 +163,18 @@
                 "problemMatcher": ["$tsc"]
             },
             {
+                "label": "PuerTS: Check And Build TS",
+                "detail": "Run type-check, ESLint check, and Prettier check first; only build JavaScript output if all checks pass. This does not modify TypeScript source files.",
+                "type": "shell",
+                "command": "npm",
+                "args": ["run", "check:build"],
+                "options": {
+                    "cwd": "${workspaceFolder:PuerTS}"
+                },
+                "group": "build",
+                "problemMatcher": ["$tsc"]
+            },
+            {
                 "label": "PuerTS: Watch TS",
                 "detail": "Keep tsc running in watch mode and recompile TypeScript to Content/JavaScript after file changes.",
                 "type": "shell",
