@@ -33,4 +33,14 @@ puerts.registerBuildinModule("fs", {
 const globalObject = globalThis as unknown as Record<string, unknown>;
 globalObject.Buffer = globalObject.Buffer ?? {};
 
-require("source-map-support").install();
+try {
+  const sourceMapSupport = require("source-map-support") as {
+    install?: () => void;
+  };
+  sourceMapSupport.install?.();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(
+    `[LogExt] source-map-support is unavailable; stack traces will use generated JavaScript locations. ${message}`,
+  );
+}
