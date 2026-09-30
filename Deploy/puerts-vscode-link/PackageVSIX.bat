@@ -47,6 +47,8 @@ if not defined VSCE_CMD if not defined VSCE_JS (
     exit /b 1
 )
 
+if exist "dist" rmdir /s /q "dist"
+
 call npm run compile || (
     popd
     exit /b 1

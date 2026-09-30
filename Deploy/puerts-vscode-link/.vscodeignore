@@ -1,0 +1,14 @@
+.gitignore
+.vscode
+.vscodeignore
+src
+tsconfig.json
+PackageVSIX.bat
+*.vsix
+**/*.map
+
+node_modules/**
+!node_modules/flexsearch
+!node_modules/flexsearch/package.json
+!node_modules/flexsearch/dist
+!node_modules/flexsearch/dist/flexsearch.bundle.min.js

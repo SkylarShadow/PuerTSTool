@@ -24,8 +24,8 @@ export default class Misc {
     return (argv.getByName("GameInstance") as UE.GameInstance).GetWorld();
   }
 
-  static GetPlayerController(): UE.PlayerController {
-    return UE.GameplayStatics.GetPlayerController(Misc.GetWorld(), 0);
+  static GetPlayerController(playerIndex = 0): UE.PlayerController {
+    return UE.GameplayStatics.GetPlayerController(Misc.GetWorld(), playerIndex);
   }
 
   //获取GameInstance

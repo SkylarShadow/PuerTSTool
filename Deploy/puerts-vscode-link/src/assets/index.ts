@@ -1,0 +1,1 @@
+export { registerAssetPathFeatures } from "./assetPathCodeLens";

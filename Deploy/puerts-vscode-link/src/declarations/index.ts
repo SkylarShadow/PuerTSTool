@@ -1,0 +1,1 @@
+export { registerDeclarationFeatures } from "./typeDeclarationHover";
