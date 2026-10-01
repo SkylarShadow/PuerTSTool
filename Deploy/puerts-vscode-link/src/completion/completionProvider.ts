@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 import { DtsIndex } from "./dtsIndex";
-import { matchesAllTerms, scoreMatch, tokenizeQuery } from "./matcher";
+import { FrameworkApiEntry, FrameworkApiIndex } from "./frameworkApiIndex";
 import { DtsApiEntry, DtsApiKind } from "./types";
 
 const selector: vscode.DocumentSelector = [
@@ -22,40 +22,25 @@ type CompletionContext = {
     receiver?: string;
 };
 
-type BuiltinApiEntry = {
-    symbol: string;
-    qualifiedName: string;
-    insertText: string | vscode.SnippetString;
-    detail: string;
-    documentation: string;
-};
-
-const builtinApiEntries: BuiltinApiEntry[] = [
-    makeMiscApi("GetWorld", "Misc.GetWorld()", "Get current UE world."),
-    makeMiscApi("GetPlayerController", new vscode.SnippetString("Misc.GetPlayerController(${1:0})"), "Get player controller by index. Defaults to 0."),
-    makeMiscApi("GetGameInstance", "Misc.GetGameInstance()", "Get current game instance."),
-    makeMiscApi("GetTSSubsys", "Misc.GetTSSubsys()", "Get PuerTSTool TS subsystem."),
-    makeMiscApi("PrintInScreen", new vscode.SnippetString("Misc.PrintInScreen(${1:\"\"})"), "Print a debug message to the UE screen."),
-    makeMiscApi("IsValid", new vscode.SnippetString("Misc.IsValid(${1:object})"), "Safely test whether a UE object reference is valid."),
-    makeMiscApi("AsyncLoad", new vscode.SnippetString("Misc.AsyncLoad(${1:path})"), "Asynchronously load a UE class by asset path."),
-    makeMiscApi("GetCommonText", new vscode.SnippetString("Misc.GetCommonText(${1:key})"), "Read localized text from the common string table."),
-    makeMiscApi("GetErrorCodeText", new vscode.SnippetString("Misc.GetErrorCodeText(${1:key})"), "Read localized text from the error-code string table."),
-];
-
 export function registerDtsCompletion(context: vscode.ExtensionContext): void {
     const dtsIndex = new DtsIndex();
+    const frameworkApiIndex = new FrameworkApiIndex();
     context.subscriptions.push(
         dtsIndex,
+        frameworkApiIndex,
         vscode.languages.registerCompletionItemProvider(
             selector,
-            new PuertsDtsCompletionProvider(dtsIndex),
+            new PuertsDtsCompletionProvider(dtsIndex, frameworkApiIndex),
             ...triggerCharacters,
         ),
     );
 }
 
 class PuertsDtsCompletionProvider implements vscode.CompletionItemProvider {
-    constructor(private readonly dtsIndex: DtsIndex) {
+    constructor(
+        private readonly dtsIndex: DtsIndex,
+        private readonly frameworkApiIndex: FrameworkApiIndex,
+    ) {
     }
 
     async provideCompletionItems(
@@ -68,10 +53,10 @@ class PuertsDtsCompletionProvider implements vscode.CompletionItemProvider {
             return undefined;
         }
 
-        const builtinEntries = searchBuiltinApis(completionContext);
+        const frameworkApiEntries = await this.searchFrameworkApis(completionContext);
         let entries: DtsApiEntry[] = [];
 
-        if (builtinEntries.length > 0 && !this.dtsIndex.isReady()) {
+        if (frameworkApiEntries.length > 0 && !this.dtsIndex.isReady()) {
             void this.dtsIndex.ensureReady().then(undefined, () => undefined);
         } else {
             await this.dtsIndex.ensureReady();
@@ -83,13 +68,22 @@ class PuertsDtsCompletionProvider implements vscode.CompletionItemProvider {
 
         return new vscode.CompletionList(
             [
-                ...builtinEntries.map((entry, index) => makeBuiltinCompletionItem(entry, completionContext, index)),
+                ...frameworkApiEntries.map((entry, index) => makeFrameworkApiCompletionItem(entry, completionContext, index)),
                 ...entries.map((entry, index) =>
-                    makeCompletionItem(entry, completionContext, index + builtinEntries.length),
+                    makeCompletionItem(entry, completionContext, index + frameworkApiEntries.length),
                 ),
             ],
             false,
         );
+    }
+
+    private async searchFrameworkApis(completionContext: CompletionContext): Promise<FrameworkApiEntry[]> {
+        if (completionContext.receiver) {
+            return [];
+        }
+
+        await this.frameworkApiIndex.ensureReady();
+        return this.frameworkApiIndex.search(completionContext.query);
     }
 }
 
@@ -127,60 +121,21 @@ function makeCompletionItem(
     return item;
 }
 
-function makeBuiltinCompletionItem(
-    entry: BuiltinApiEntry,
+function makeFrameworkApiCompletionItem(
+    entry: FrameworkApiEntry,
     completionContext: CompletionContext,
     rank: number,
 ): vscode.CompletionItem {
     const item = new vscode.CompletionItem(entry.symbol, vscode.CompletionItemKind.Function);
     item.detail = `PuerTS API -> ${entry.qualifiedName}()`;
-    item.documentation = new vscode.MarkdownString(`${entry.documentation}\n\nRequires \`import Misc ...\` in the current file.`);
+    item.documentation = new vscode.MarkdownString(
+        `\`\`\`ts\n${entry.detail}\n\`\`\`\n\n${entry.documentation}\n\nThis completion does not add imports automatically.`,
+    );
     item.range = completionContext.range;
     item.insertText = entry.insertText;
     item.filterText = `${entry.symbol} ${entry.qualifiedName} ${completionContext.query}`;
     item.sortText = String(rank).padStart(3, "0");
     return item;
-}
-
-function searchBuiltinApis(completionContext: CompletionContext): BuiltinApiEntry[] {
-    if (completionContext.receiver) {
-        return [];
-    }
-
-    const terms = tokenizeQuery(completionContext.query);
-    if (!terms.length) {
-        return [];
-    }
-
-    return builtinApiEntries
-        .map((entry) => ({ entry, dtsEntry: toDtsEntry(entry) }))
-        .filter(({ dtsEntry }) => matchesAllTerms(dtsEntry, terms))
-        .sort((left, right) =>
-            scoreMatch(right.dtsEntry, completionContext.query) - scoreMatch(left.dtsEntry, completionContext.query),
-        )
-        .map(({ entry }) => entry);
-}
-
-function makeMiscApi(symbol: string, insertText: string | vscode.SnippetString, documentation: string): BuiltinApiEntry {
-    return {
-        symbol,
-        qualifiedName: `Misc.${symbol}`,
-        insertText,
-        detail: `Misc.${symbol}`,
-        documentation,
-    };
-}
-
-function toDtsEntry(entry: BuiltinApiEntry): DtsApiEntry {
-    return {
-        id: -1,
-        kind: "function",
-        symbol: entry.symbol,
-        qualifiedName: entry.qualifiedName,
-        detail: entry.detail,
-        uri: vscode.Uri.file(""),
-        range: new vscode.Range(0, 0, 0, 0),
-    };
 }
 
 function completionItemKind(kind: DtsApiKind): vscode.CompletionItemKind {

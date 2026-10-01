@@ -24,7 +24,14 @@ get controller
 
 can suggest `UE.GameplayStatics.GetPlayerController`. When writing a member expression such as `UE.GameplayStatics.Get...`, it only suggests members of that type and inserts the member name instead of duplicating the receiver. The index is rebuilt when a declaration file under `Typing` changes.
 
-The extension also provides built-in PuerTSTool helper completions. For example, typing:
+The extension also scans PuerTSTool framework helper files and provides helper completions. By default it scans:
+
+```json
+"puertsTool.apiScanFolders": ["TypeScript/Framework/Misc"],
+"puertsTool.apiScanExcludes": ["TypeScript/Framework/Misc/LogExt/**"]
+```
+
+It supports exported functions and static methods on exported classes. For example, typing:
 
 ```ts
 GetWorld
@@ -37,6 +44,20 @@ Misc.GetWorld()
 ```
 
 This helper completion does not add imports automatically, so mixin files should already import `Misc`.
+
+To add more framework API folders, open VSCode Settings and search for `PuerTS Tool`, or add workspace settings such as:
+
+```json
+"puertsTool.apiScanFolders": [
+    "TypeScript/Framework/Misc",
+    "TypeScript/Framework/UI",
+    "TypeScript/Framework/Gameplay"
+],
+"puertsTool.apiScanExcludes": [
+    "TypeScript/Framework/Misc/LogExt/**",
+    "TypeScript/Framework/**/__tests__/**"
+]
+```
 
 ## Package
 

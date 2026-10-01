@@ -2,7 +2,7 @@
     "name": "puerts-tool-vscode-link",
     "displayName": "PuerTS Tool Link",
     "description": "PuerTS Blueprint links, declaration previews, and DTS API completion for VSCode.",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "publisher": "puerts-tool",
     "engines": {
         "vscode": "^1.90.0"
@@ -56,6 +56,26 @@
                     "minimum": 8,
                     "maximum": 120,
                     "description": "Maximum declaration lines shown in PuerTS hover previews before using Peek Declaration."
+                },
+                "puertsTool.apiScanFolders": {
+                    "type": "array",
+                    "default": [
+                        "TypeScript/Framework/Misc"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Workspace-relative TypeScript folders scanned for PuerTSTool framework API completion."
+                },
+                "puertsTool.apiScanExcludes": {
+                    "type": "array",
+                    "default": [
+                        "TypeScript/Framework/Misc/LogExt/**"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Workspace-relative folders or glob patterns excluded from PuerTSTool framework API completion scanning."
                 }
             }
         }
