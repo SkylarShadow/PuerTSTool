@@ -24,6 +24,20 @@ get controller
 
 can suggest `UE.GameplayStatics.GetPlayerController`. When writing a member expression such as `UE.GameplayStatics.Get...`, it only suggests members of that type and inserts the member name instead of duplicating the receiver. The index is rebuilt when a declaration file under `Typing` changes.
 
+The extension also provides built-in PuerTSTool helper completions. For example, typing:
+
+```ts
+GetWorld
+```
+
+can suggest `PuerTS API -> Misc.GetWorld()` and insert:
+
+```ts
+Misc.GetWorld()
+```
+
+This helper completion does not add imports automatically, so mixin files should already import `Misc`.
+
 ## Package
 
 Run `PackageVSIX.bat` in this directory. The script compiles the extension and writes a `.vsix` using the extension `name` and `version` from `package.json`.

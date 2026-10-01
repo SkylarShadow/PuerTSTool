@@ -35,6 +35,10 @@ export class DtsIndex implements vscode.Disposable {
         await this.rebuilding;
     }
 
+    isReady(): boolean {
+        return !this.dirty;
+    }
+
     search(query: string, parent?: string, limit = 60): DtsApiEntry[] {
         const terms = tokenizeQuery(query);
         if (!terms.length) {
