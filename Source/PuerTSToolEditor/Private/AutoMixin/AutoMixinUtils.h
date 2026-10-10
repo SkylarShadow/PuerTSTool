@@ -22,6 +22,14 @@ namespace AutoMixinUtils
 		TMap<FString, FString> DisplayPaths;
 	};
 
+	// AssetPath 解析后的统一结果，避免各处重复拆分和规范化蓝图路径。
+	struct FAssetPathInfo
+	{
+		FString BlueprintPackageName;
+		FString ImportPath;
+		FString BlueprintType;
+	};
+
 	// 统一 import 路径格式，方便比较 ./A/B、A/B.ts、反斜杠等不同写法。
 	FString NormalizeImportPath(FString ImportPath);
 
@@ -59,8 +67,11 @@ namespace AutoMixinUtils
 	// 从已剥离注释的 TS 内容中解析 const AssetPath = "...";。
 	bool TryExtractMixinAssetPathFromCode(const FString& CodeWithoutComments, FString& OutAssetPath);
 
-	// TS 里保存的是蓝图生成类路径，例如 /Game/A/B.B_C；这里反查蓝图资源包是否还存在。
-	bool DoesBlueprintPackageExistForMixinAssetPath(const FString& AssetPath, FString& OutBlueprintPackageName);
+	// 从已剥离注释的 TS 内容中解析 export interface Xxx extends UE.Game.Xxx.Xxx_C {} 的父类型。
+	bool TryExtractMixinBlueprintTypeFromCode(const FString& CodeWithoutComments, FString& OutBlueprintType);
+
+	// 统一解析 AssetPath，例如 /Game/Test.Test_C -> Test、UE.Game.Test.Test_C 和 /Game/Test。
+	bool TryParseAssetPath(const FString& AssetPath, FAssetPathInfo& OutInfo);
 
 	// 将 TypeScript 根目录下的绝对 TS 路径转回 PreMixin import 使用的相对路径。
 	FString MakeRelativeImportPathForTsFile(const FString& TsFilePath, const FString& TypeScriptRootPath);

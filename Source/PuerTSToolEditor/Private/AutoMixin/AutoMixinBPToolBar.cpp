@@ -5,6 +5,7 @@
 #include "Editor.h"
 #include "HAL/FileManager.h"
 #include "Misc/MessageDialog.h"
+#include "Misc/PackageName.h"
 #include "PuerTSToolStyle.h"
 #include "Styling/AppStyle.h"
 #include "Widgets/Images/SImage.h"
@@ -296,8 +297,8 @@ void FAutoMixinBPToolBar::CheckAllTsMixin() const
 	//    这类问题通常来自 TS 文件被删除、移动、改名，但 PreMixin 还保留旧引用。
 	// 2. 从 TypeScript 目录出发，找所有包含 @mixin 的 TS 文件，确认它们都在 PreMixin 中启用。
 	//    这类问题通常来自手动新增 TS、误删 PreMixin 行，或者把 import 注释掉。
-	// 3. 对每个 @mixin TS 解析 AssetPath，确认它指向的蓝图包仍然存在。
-	//    这类问题通常来自蓝图被删除、移动、改名，但 TS 文件还留着旧路径。
+	// 3. 对每个 @mixin TS 解析 AssetPath，确认它指向的蓝图包仍然存在，且和 TS 文件路径、interface extends UE 类型一致。
+	//    这类问题通常来自蓝图被删除、移动、改名，或手动修改 TS 后只改了一处路径。
 	//
 	// PreMixin 中的路径统一转成不带 ./ 和 .ts 的 key；TS 文件路径也转成同样格式。
 	// 这样可以避免 ./A/B、A/B.ts、反斜杠、大小写差异导致误判。
@@ -383,10 +384,31 @@ void FAutoMixinBPToolBar::CheckAllTsMixin() const
 		}
 		else
 		{
-			FString BlueprintPackageName;
-			if (!AutoMixinUtils::DoesBlueprintPackageExistForMixinAssetPath(MixinAssetPath, BlueprintPackageName))
+			AutoMixinUtils::FAssetPathInfo AssetPathInfo;
+			if (!AutoMixinUtils::TryParseAssetPath(MixinAssetPath, AssetPathInfo))
+			{
+				AutoMixinUtils::AddIssue(Issues, FString::Printf(TEXT("Mixin TS的AssetPath格式无法映射到TS路径和UE类型: %s -> %s"), *ImportPath, *MixinAssetPath));
+				continue;
+			}
+
+			if (!FPackageName::DoesPackageExist(AssetPathInfo.BlueprintPackageName))
 			{
 				AutoMixinUtils::AddIssue(Issues, FString::Printf(TEXT("Mixin TS对应蓝图不存在: %s -> %s"), *ImportPath, *MixinAssetPath));
+			}
+
+			if (AutoMixinUtils::MakeImportKey(ImportPath) != AutoMixinUtils::MakeImportKey(AssetPathInfo.ImportPath))
+			{
+				AutoMixinUtils::AddIssue(Issues, FString::Printf(TEXT("Mixin TS文件路径与AssetPath不对应: 文件=%s, AssetPath=%s, 期望路径=%s"), *ImportPath, *MixinAssetPath, *AssetPathInfo.ImportPath));
+			}
+
+			FString ActualBlueprintType;
+			if (!AutoMixinUtils::TryExtractMixinBlueprintTypeFromCode(CodeWithoutComments, ActualBlueprintType))
+			{
+				AutoMixinUtils::AddIssue(Issues, FString::Printf(TEXT("Mixin TS缺少export interface extends UE类型声明: %s"), *ImportPath));
+			}
+			else if (!ActualBlueprintType.Equals(AssetPathInfo.BlueprintType, ESearchCase::CaseSensitive))
+			{
+				AutoMixinUtils::AddIssue(Issues, FString::Printf(TEXT("Mixin TS的interface类型与AssetPath不对应: %s, AssetPath=%s, interface extends=%s, 期望=%s"), *ImportPath, *MixinAssetPath, *ActualBlueprintType, *AssetPathInfo.BlueprintType));
 			}
 		}
 	}

@@ -10,6 +10,27 @@
 
 namespace AutoMixinUtils
 {
+	namespace
+	{
+		bool TryBuildImportPathFromObjectPath(const FString& ObjectPath, FString& OutActualPath, FString& OutImportPath)
+		{
+			FString Lefts;
+			FString Rights;
+			ObjectPath.Split(TEXT("."), &Lefts, &Rights);
+
+			TArray<FString> PathParts;
+			Lefts.ParseIntoArray(PathParts, TEXT("/"), true);
+			if (PathParts.IsEmpty())
+			{
+				return false;
+			}
+
+			OutActualPath = PathParts[0] == TEXT("Game") ? Lefts.Mid(5) : Lefts;
+			OutImportPath = NormalizeImportPath(OutActualPath.Mid(1));
+			return true;
+		}
+	}
+
 	FString NormalizeImportPath(FString ImportPath)
 	{
 		ImportPath.TrimStartAndEndInline();
@@ -67,19 +88,11 @@ namespace AutoMixinUtils
 		}
 
 		const FString BlueprintPath = Blueprint->GetPathName();
-		FString Lefts;
-		FString Rights;
-		BlueprintPath.Split(TEXT("."), &Lefts, &Rights);
-
-		TArray<FString> PathParts;
-		Lefts.ParseIntoArray(PathParts, TEXT("/"), true);
-		if (PathParts.IsEmpty())
+		if (!TryBuildImportPathFromObjectPath(BlueprintPath, OutInfo.ActualPath, OutInfo.ImportPath))
 		{
 			return false;
 		}
 
-		OutInfo.ActualPath = PathParts[0] == TEXT("Game") ? Lefts.Mid(5) : Lefts;
-		OutInfo.ImportPath = NormalizeImportPath(OutInfo.ActualPath.Mid(1));
 		OutInfo.TsFilePath = FPaths::Combine(GetTypeScriptRootPath(), OutInfo.ImportPath + TEXT(".ts"));
 		FPaths::NormalizeFilename(OutInfo.TsFilePath);
 		return true;
@@ -277,16 +290,50 @@ namespace AutoMixinUtils
 
 	bool TryExtractMixinAssetPathFromCode(const FString& CodeWithoutComments, FString& OutAssetPath)
 	{
-		const int32 AssetPathIndex = CodeWithoutComments.Find(TEXT("AssetPath"));
-		if (AssetPathIndex == INDEX_NONE)
+		int32 SearchIndex = 0;
+		int32 EqualIndex = INDEX_NONE;
+		while (true)
 		{
-			return false;
-		}
+			const int32 ConstIndex = CodeWithoutComments.Find(TEXT("const"), ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchIndex);
+			if (ConstIndex == INDEX_NONE)
+			{
+				return false;
+			}
 
-		const int32 EqualIndex = CodeWithoutComments.Find(TEXT("="), ESearchCase::CaseSensitive, ESearchDir::FromStart, AssetPathIndex);
-		if (EqualIndex == INDEX_NONE)
-		{
-			return false;
+			// 只接受 const AssetPath =，避免把 SomeAssetPath 或对象属性误识别为配置项。
+			const int32 ConstEnd = ConstIndex + FCString::Strlen(TEXT("const"));
+			int32 NameStart = ConstEnd;
+			while (NameStart < CodeWithoutComments.Len() && FChar::IsWhitespace(CodeWithoutComments[NameStart]))
+			{
+				++NameStart;
+			}
+			if (NameStart == ConstEnd)
+			{
+				SearchIndex = ConstEnd;
+				continue;
+			}
+
+			const FString AssetPathName = TEXT("AssetPath");
+			if (CodeWithoutComments.Mid(NameStart, AssetPathName.Len()) != AssetPathName)
+			{
+				SearchIndex = ConstIndex + FCString::Strlen(TEXT("const"));
+				continue;
+			}
+
+			int32 AfterName = NameStart + AssetPathName.Len();
+			while (AfterName < CodeWithoutComments.Len() && FChar::IsWhitespace(CodeWithoutComments[AfterName]))
+			{
+				++AfterName;
+			}
+
+			if (AfterName >= CodeWithoutComments.Len() || CodeWithoutComments[AfterName] != TEXT('='))
+			{
+				SearchIndex = ConstIndex + FCString::Strlen(TEXT("const"));
+				continue;
+			}
+
+			EqualIndex = AfterName;
+			break;
 		}
 
 		const int32 DoubleQuoteIndex = CodeWithoutComments.Find(TEXT("\""), ESearchCase::CaseSensitive, ESearchDir::FromStart, EqualIndex);
@@ -316,20 +363,80 @@ namespace AutoMixinUtils
 		return !OutAssetPath.IsEmpty();
 	}
 
-	bool DoesBlueprintPackageExistForMixinAssetPath(const FString& AssetPath, FString& OutBlueprintPackageName)
+	bool TryExtractMixinBlueprintTypeFromCode(const FString& CodeWithoutComments, FString& OutBlueprintType)
+	{
+		int32 SearchIndex = 0;
+		while (true)
+		{
+			const int32 InterfaceIndex = CodeWithoutComments.Find(TEXT("export interface"), ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchIndex);
+			if (InterfaceIndex == INDEX_NONE)
+			{
+				return false;
+			}
+
+			const int32 InterfaceEnd = CodeWithoutComments.Find(TEXT("{"), ESearchCase::CaseSensitive, ESearchDir::FromStart, InterfaceIndex);
+			const int32 ExtendsIndex = CodeWithoutComments.Find(TEXT("extends"), ESearchCase::CaseSensitive, ESearchDir::FromStart, InterfaceIndex);
+			if (ExtendsIndex != INDEX_NONE && (InterfaceEnd == INDEX_NONE || ExtendsIndex < InterfaceEnd))
+			{
+				int32 TypeStart = ExtendsIndex + FCString::Strlen(TEXT("extends"));
+				while (TypeStart < CodeWithoutComments.Len() && FChar::IsWhitespace(CodeWithoutComments[TypeStart]))
+				{
+					++TypeStart;
+				}
+
+				int32 TypeEnd = TypeStart;
+				while (TypeEnd < CodeWithoutComments.Len()
+					&& !FChar::IsWhitespace(CodeWithoutComments[TypeEnd])
+					&& CodeWithoutComments[TypeEnd] != TEXT('{')
+					&& CodeWithoutComments[TypeEnd] != TEXT(',')
+					&& CodeWithoutComments[TypeEnd] != TEXT('>'))
+				{
+					++TypeEnd;
+				}
+
+				OutBlueprintType = CodeWithoutComments.Mid(TypeStart, TypeEnd - TypeStart);
+				OutBlueprintType.TrimStartAndEndInline();
+				return !OutBlueprintType.IsEmpty();
+			}
+
+			SearchIndex = InterfaceIndex + FCString::Strlen(TEXT("export interface"));
+		}
+	}
+
+	bool TryParseAssetPath(const FString& AssetPath, FAssetPathInfo& OutInfo)
 	{
 		FString NormalizedAssetPath = AssetPath;
 		NormalizedAssetPath.TrimStartAndEndInline();
 		NormalizedAssetPath.ReplaceInline(TEXT("\\"), TEXT("/"));
-		NormalizedAssetPath.RemoveFromEnd(TEXT("_C"));
 
-		OutBlueprintPackageName = FPackageName::ObjectPathToPackageName(NormalizedAssetPath);
-		if (OutBlueprintPackageName.IsEmpty())
+		const int32 DotIndex = NormalizedAssetPath.Find(TEXT("."), ESearchCase::CaseSensitive, ESearchDir::FromStart);
+		if (DotIndex == INDEX_NONE)
 		{
 			return false;
 		}
 
-		return FPackageName::DoesPackageExist(OutBlueprintPackageName);
+		const FString PackagePath = NormalizedAssetPath.Left(DotIndex);
+		if (PackagePath.Len() <= 1 || !PackagePath.StartsWith(TEXT("/")))
+		{
+			return false;
+		}
+
+		FString PackageLookupPath = NormalizedAssetPath;
+		PackageLookupPath.RemoveFromEnd(TEXT("_C"));
+		const FString BlueprintPackageName = FPackageName::ObjectPathToPackageName(PackageLookupPath);
+		if (BlueprintPackageName.IsEmpty())
+		{
+			return false;
+		}
+
+		OutInfo.BlueprintPackageName = BlueprintPackageName;
+		FString ActualPath;
+		if (!TryBuildImportPathFromObjectPath(NormalizedAssetPath, ActualPath, OutInfo.ImportPath))
+		{
+			return false;
+		}
+		OutInfo.BlueprintType = TEXT("UE") + NormalizedAssetPath.Replace(TEXT("/"), TEXT("."));
+		return !OutInfo.ImportPath.IsEmpty() && !OutInfo.BlueprintType.IsEmpty();
 	}
 
 	FString MakeRelativeImportPathForTsFile(const FString& TsFilePath, const FString& TypeScriptRootPath)
